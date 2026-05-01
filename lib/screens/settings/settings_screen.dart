@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/accessibility_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -117,41 +118,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _showAccessibilityDialog() async {
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Accessibility Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                title: const Text('Voice Feedback'),
-                subtitle: const Text('On setting updated or room added'),
-                value: _voiceFeedbackEnabled,
-                onChanged: (val) {
-                  setDialogState(() => _voiceFeedbackEnabled = val);
-                  setState(() => _voiceFeedbackEnabled = val);
-                },
-                activeColor: Theme.of(context).colorScheme.primary,
+      builder: (context) => Consumer( // Consumer add kiya taake global state read ho
+          builder: (context, ref, child) {
+            // Riverpod se current status uthaya
+            final isVoiceEnabled = ref.watch(voiceFeedbackProvider);
+
+            return AlertDialog(
+              title: Semantics(
+                header: true,
+                child: Text('Accessibility Settings'),
               ),
-              SwitchListTile(
-                title: const Text('Alert Sounds'),
-                subtitle: const Text('Play sound for each alert'),
-                value: _alertSoundEnabled,
-                onChanged: (val) {
-                  setDialogState(() => _alertSoundEnabled = val);
-                  setState(() => _alertSoundEnabled = val);
-                },
-                activeColor: Theme.of(context).colorScheme.primary,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Semantics(
+                    label: 'Toggle Voice Feedback',
+                    child: SwitchListTile(
+                      title: const Text('Voice Feedback'),
+                      subtitle: const Text('App will speak when actions are performed'),
+                      value: isVoiceEnabled,
+                      onChanged: (val) {
+                        // Provider update kiya
+                        ref.read(voiceFeedbackProvider.notifier).state = val;
+
+                        // Agar ON kiya hai toh foran demo aawaz sunao
+                        if (val) {
+                          ref.read(ttsServiceProvider).speak("Voice feedback is now enabled");
+                        }
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  // Alert sound wali tile waise hi rahegi
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          }
       ),
     );
   }
@@ -293,18 +301,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildListTile(IconData icon, String title, {VoidCallback? onTap}) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FC),
-          borderRadius: BorderRadius.circular(10),
+    return Semantics(
+      button: true, // TalkBack ko batayega ke ye button hai
+      label: title, // TalkBack title parhega
+      hint: 'Double tap to open', // TalkBack user ko hint dega
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FC),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: const Color(0xFF2D3436)),
         ),
-        child: Icon(icon, color: const Color(0xFF2D3436)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF2D3436))),
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        onTap: onTap,
+        // Exclude semantics from inner widgets to avoid double reading
+        // title aur trailing ko dubara parhne se rokne ke liye:
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF2D3436))),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: onTap,
     );
   }
 

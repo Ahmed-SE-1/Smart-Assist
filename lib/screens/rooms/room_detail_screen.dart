@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/device.dart';
 import '../../providers/smart_home_provider.dart';
+import '../../providers/accessibility_provider.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomName;
@@ -29,11 +30,13 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF2D3436)),
+          tooltip: 'Go Back', // TalkBack will read this
           onPressed: () => context.pop(),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Color(0xFF2D3436)),
+            tooltip: 'Add new device', // TalkBack will read this
             onPressed: () => _showAddDeviceDialog(room.id),
           ),
           PopupMenuButton<String>(
@@ -181,15 +184,21 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             children: [
               Text('Spd ${device.fanSpeed}', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
               Expanded(
-                child: Slider(
-                  value: device.fanSpeed.toDouble(),
-                  min: 0,
-                  max: 5,
-                  divisions: 5,
-                  label: '${device.fanSpeed}',
-                  onChanged: (v) => _setFanSpeed(device, v.round()),
-                  activeColor: Colors.teal,
-                  inactiveColor: Colors.teal.withOpacity(0.2),
+                child: Semantics(
+                  label: '${device.name} Speed Control',
+                  value: '${device.fanSpeed}',
+                  increasedValue: 'Speed Increased',
+                  decreasedValue: 'Speed Decreased',
+                  child: Slider(
+                    value: device.fanSpeed.toDouble(),
+                    min: 0,
+                    max: 5,
+                    divisions: 5,
+                    label: '${device.fanSpeed}',
+                    onChanged: (v) => _setFanSpeed(device, v.round()),
+                    activeColor: Colors.teal,
+                    inactiveColor: Colors.teal.withOpacity(0.2),
+                  ),
                 ),
               ),
             ],
@@ -245,15 +254,19 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               children: [
                 const Text('16°C', style: TextStyle(fontSize: 12, color: Colors.grey)),
                 Expanded(
-                  child: Slider(
-                    value: device.acTemperature.toDouble(),
-                    min: 16,
-                    max: 30,
-                    divisions: 14,
-                    label: '${device.acTemperature}°C',
-                    onChanged: (v) => _setACTemperature(device, v.round()),
-                    activeColor: Colors.blue,
-                    inactiveColor: Colors.blue.withOpacity(0.2),
+                  child: Semantics(
+                    label: '${device.name} Temperature Control',
+                    value: '${device.acTemperature} degrees',
+                    child: Slider(
+                      value: device.acTemperature.toDouble(),
+                      min: 16,
+                      max: 30,
+                      divisions: 14,
+                      label: '${device.acTemperature}°C',
+                      onChanged: (v) => _setACTemperature(device, v.round()),
+                      activeColor: Colors.blue,
+                      inactiveColor: Colors.blue.withOpacity(0.2),
+                    ),
                   ),
                 ),
                 const Text('30°C', style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -315,12 +328,18 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     final success = await ref.read(devicesProvider.notifier).toggleDevice(device);
     if (mounted) {
       if (success) {
+        // Yahan status variable declare karna zaroori hai
+        final status = !device.isOn ? "ON" : "OFF";
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${device.name} is now ${!device.isOn ? "ON" : "OFF"}'),
+            // Yahan bhi hum ab direct variable use kar sakte hain
+            content: Text('${device.name} is now $status'),
             duration: const Duration(seconds: 1),
           ),
         );
+        // == TTS ==
+        ref.read(ttsServiceProvider).speak("${device.name} is turned $status in ${widget.roomName}");
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
@@ -336,6 +355,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
       );
     }
+    else {
+      // === TTS FOR FAN SPEED ===
+      ref.read(ttsServiceProvider).speak("${device.name} speed set to $speed");
+  }
   }
 
   Future<void> _setACTemperature(Device device, int temperature) async {
@@ -344,6 +367,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
       );
+    }
+    else {
+      // === TTS FOR AC TEMP ===
+      ref.read(ttsServiceProvider).speak("${device.name} temperature set to $temperature degrees");
     }
   }
 

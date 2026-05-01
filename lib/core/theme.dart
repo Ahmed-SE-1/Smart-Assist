@@ -22,7 +22,7 @@ class AppTheme {
         secondary: accentColor,
       ),
       scaffoldBackgroundColor: backgroundColorLight,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColorLight,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -67,7 +67,7 @@ class AppTheme {
         secondary: accentColor,
       ),
       scaffoldBackgroundColor: backgroundColorDark,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColorDark,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

@@ -2,8 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/user.dart';
 import '../services/local_storage_service.dart';
-import '../services/social_auth_service.dart';
 import 'user_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthState {
   final bool isAuthenticated;
@@ -48,7 +49,9 @@ class AuthState {
 
 class AuthNotifier extends Notifier<AuthState> {
   final LocalStorageService _storage = LocalStorageService();
-  final SocialAuthService _socialAuth = SocialAuthService();
+  final firebase.FirebaseAuth _auth = firebase.FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
   @override
   AuthState build() {
     Future.microtask(_checkLoginStatus);
@@ -57,18 +60,25 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _checkLoginStatus() async {
     try {
-      final isLogged = await _storage.isLoggedIn();
       final hasSeenOnboarding = await _storage.hasSeenOnboarding();
-      
       final isFirstTime = await _storage.isFirstTime();
       final isHubConnected = await _storage.isHubConnected();
-      
+
+      // Check Firebase current user instead of local storage
+      final firebaseUser = _auth.currentUser;
+      final isLogged = firebaseUser != null;
+
       if (isLogged) {
-          await ref.read(userProvider.notifier).loadUser();
+        // Sync Firebase user to your local User model/provider
+        final user = User(
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName ?? 'User',
+          email: firebaseUser.email ?? '',
+          // avatarUrl: firebaseUser.photoURL, // If your model supports this
+        );
+        ref.read(userProvider.notifier).setUser(user);
       }
 
-      await Future.delayed(const Duration(seconds: 1));
-      
       state = state.copyWith(
         isAuthenticated: isLogged,
         isInitializing: false,
@@ -77,114 +87,134 @@ class AuthNotifier extends Notifier<AuthState> {
         isHubConnected: isHubConnected,
       );
     } catch (e) {
-      state = state.copyWith(isInitializing: false);
+      state = state.copyWith(isInitializing: false, error: e.toString());
     }
   }
 
   Future<bool> login(String email, String password) async {
     state = state.copyWith(isLoading: true, clearError: true);
-    await Future.delayed(const Duration(seconds: 1));
-    
-    final isValid = await _storage.verifyCredentials(email, password);
-    if (!isValid) {
-        state = state.copyWith(isLoading: false, error: 'Invalid email or password');
-        return false;
-    }
-    
-    final user = await _storage.getUserByEmail(email);
-    if (user == null) {
-         state = state.copyWith(isLoading: false, error: 'User data not found');
-         return false;
-    }
-    
-    await _storage.setLoggedIn(true);
-    await _storage.saveUser(user);
-    await _storage.setHasSeenOnboarding(true);
-    ref.read(userProvider.notifier).setUser(user);
+    try {
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    final isFirstTime = await _storage.isFirstTime();
-    final isHubConnected = await _storage.isHubConnected();
+      // Update local state
+      await _storage.setHasSeenOnboarding(true);
 
-    state = state.copyWith(
-      isAuthenticated: true, 
-      isLoading: false, 
-      hasSeenOnboarding: true,
-      isFirstTime: isFirstTime,
-      isHubConnected: isHubConnected,
-    );
-    return true;
+      final user = User(
+        id: userCredential.user!.uid,
+        name: userCredential.user!.displayName ?? 'User',
+        email: userCredential.user!.email!,
+      );
+      ref.read(userProvider.notifier).setUser(user);
+
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        hasSeenOnboarding: true,
+      );
+      return true;
+    } on firebase.FirebaseAuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message ?? 'Login failed');
+      return false;
+    }
   }
 
   Future<bool> signup(String name, String email, String password) async {
     state = state.copyWith(isLoading: true, clearError: true);
-    await Future.delayed(const Duration(seconds: 1));
-    
-    final newUser = User(
-      id: const Uuid().v4(),
-      name: name,
-      email: email,
-    );
-    
-    await _storage.saveCredentials(email, password);
-    await _storage.saveUser(newUser);
-    await _storage.setLoggedIn(true);
-    await _storage.setHasSeenOnboarding(true);
-    ref.read(userProvider.notifier).setUser(newUser);
-
-    final isFirstTime = await _storage.isFirstTime();
-    final isHubConnected = await _storage.isHubConnected();
-
-    state = state.copyWith(
-      isAuthenticated: true, 
-      isLoading: false, 
-      hasSeenOnboarding: true,
-      isFirstTime: isFirstTime,
-      isHubConnected: isHubConnected,
-    );
-    return true;
-  }
-
-  Future<void> socialLogin(String provider) async {
-    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
-      state = state.copyWith(isLoading: false, error: 'AUTH_CONFIG_ERROR');
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'AUTH_CONFIG_ERROR');
-    }
-  }
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-  Future<void> loginWithMockSocial(String name, String email, String? id, String? avatarUrl) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    await Future.delayed(const Duration(milliseconds: 800));
+      // Update display name in Firebase
+      await userCredential.user!.updateDisplayName(name);
 
-    User? user = await _storage.getUserByEmail(email);
+      await _storage.setHasSeenOnboarding(true);
 
-    if (user == null) {
-      user = User(
-        id: id ?? const Uuid().v4(),
+      final newUser = User(
+        id: userCredential.user!.uid,
         name: name,
         email: email,
-        avatarUrl: avatarUrl,
       );
-      await _storage.saveUser(user);
-      await _storage.saveCredentials(email, 'social123');
+      ref.read(userProvider.notifier).setUser(newUser);
+
+      state = state.copyWith(
+        isAuthenticated: true,
+        isLoading: false,
+        hasSeenOnboarding: true,
+      );
+      return true;
+    } on firebase.FirebaseAuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message ?? 'Signup failed');
+      return false;
     }
+  }
 
-    await _storage.setLoggedIn(true);
-    await _storage.setHasSeenOnboarding(true);
-    ref.read(userProvider.notifier).setUser(user);
-    
-    final isFirstTime = await _storage.isFirstTime();
-    final isHubConnected = await _storage.isHubConnected();
+  Future<void> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      // FIX: Initialize the package (Mandatory for v7+)
+      await _googleSignIn.initialize();
 
-    state = state.copyWith(
-      isAuthenticated: true, 
-      isLoading: false, 
-      hasSeenOnboarding: true,
-      isFirstTime: isFirstTime,
-      isHubConnected: isHubConnected,
-    );
+      // FIX: Trigger the new authentication flow using .authenticate()
+      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
+      if (googleUser == null) {
+        state = state.copyWith(isLoading: false); // User canceled
+        return;
+      }
+
+      // Obtain ID token from standard authentication
+      final googleAuth = await googleUser.authentication;
+
+      // FIX: Request explicit authorization to extract the Access Token
+      final authorizedUser = await googleUser.authorizationClient.authorizeScopes(['email', 'profile']);
+
+      // Create a new credential combining both tokens
+      final credential = firebase.GoogleAuthProvider.credential(
+        accessToken: authorizedUser.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase
+      final userCredential = await _auth.signInWithCredential(credential);
+
+      // Save onboarding state
+      await _storage.setHasSeenOnboarding(true);
+
+      // Sync with your User model
+      final user = User(
+        id: userCredential.user!.uid,
+        name: userCredential.user!.displayName ?? googleUser.displayName ?? 'User',
+        email: userCredential.user!.email ?? googleUser.email,
+      );
+      ref.read(userProvider.notifier).setUser(user);
+
+      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+    } on firebase.FirebaseAuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Google sign-in failed');
+    }
+  }
+
+  Future<bool> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return true;
+    } on firebase.FirebaseAuthException catch (e) {
+      state = state.copyWith(error: e.message);
+      return false;
+    }
+  }
+
+  Future<void> logout() async {
+    await _auth.signOut();
+    await _googleSignIn.signOut();
+    ref.read(userProvider.notifier).clearUser();
+    state = state.copyWith(isAuthenticated: false);
   }
 
   Future<void> simulateHubConnection({
@@ -222,12 +252,6 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> completeOnboarding() async {
     await _storage.setHasSeenOnboarding(true);
     state = state.copyWith(hasSeenOnboarding: true);
-  }
-
-  Future<void> logout() async {
-    await _storage.clearUser();
-    ref.read(userProvider.notifier).clearUser();
-    state = state.copyWith(isAuthenticated: false);
   }
 }
 

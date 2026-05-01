@@ -45,37 +45,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
-  Future<void> _socialLogin(String provider) async {
-    await ref.read(authProvider.notifier).socialLogin(provider);
+  Future<void> _handleGoogleSignIn() async {
+    await ref.read(authProvider.notifier).signInWithGoogle();
     if (!mounted) return;
-    
+
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated) {
       context.go('/home');
-    } else if (authState.error == 'AUTH_CONFIG_ERROR') {
-      // Fetch real users from our storage to show in the professional picker
-      final allUsers = await LocalStorageService().getAllUsers();
-      final socialAccounts = allUsers.map((u) => SocialAccount(
-        name: u.name, 
-        email: u.email, 
-        avatarUrl: u.avatarUrl
-      )).toList();
-
-      final account = await SocialAccountPicker.show(
-        context, 
-        provider, 
-        initialAccounts: socialAccounts
-      );
-      
-      if (account != null && mounted) {
-        await ref.read(authProvider.notifier).loginWithMockSocial(
-          account.name, 
-          account.email, 
-          null, 
-          account.avatarUrl
-        );
-        if (mounted) context.go('/home');
-      }
     } else if (authState.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authState.error!), backgroundColor: Colors.red),
@@ -173,7 +149,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(height: 24),
                     OutlinedButton.icon(
-                      onPressed: ref.watch(authProvider).isLoading ? null : () => _socialLogin('Google'),
+                      onPressed: ref.watch(authProvider).isLoading ? null : () => _handleGoogleSignIn(),
                       icon: const Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
                       label: const Text('Continue with Google', style: TextStyle(color: Colors.black87)),
                       style: OutlinedButton.styleFrom(

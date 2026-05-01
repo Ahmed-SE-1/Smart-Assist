@@ -37,37 +37,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _socialLogin(String provider) async {
-    await ref.read(authProvider.notifier).socialLogin(provider);
+  Future<void> _handleGoogleSignIn() async {
+    await ref.read(authProvider.notifier).signInWithGoogle();
     if (!mounted) return;
-    
+
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated) {
       context.go('/home');
-    } else if (authState.error == 'AUTH_CONFIG_ERROR') {
-      // Fetch real users from our storage to show in the professional picker
-      final allUsers = await LocalStorageService().getAllUsers();
-      final socialAccounts = allUsers.map((u) => SocialAccount(
-        name: u.name, 
-        email: u.email, 
-        avatarUrl: u.avatarUrl
-      )).toList();
-
-      final account = await SocialAccountPicker.show(
-        context, 
-        provider, 
-        initialAccounts: socialAccounts
-      );
-      
-      if (account != null && mounted) {
-        await ref.read(authProvider.notifier).loginWithMockSocial(
-          account.name, 
-          account.email, 
-          null, 
-          account.avatarUrl
-        );
-        if (mounted) context.go('/home');
-      }
     } else if (authState.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authState.error!), backgroundColor: Colors.red),
@@ -150,7 +126,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () async {
+                          if (_emailController.text.isEmpty || !_emailController.text.contains('@')) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter a valid email address first.')),
+                            );
+                            return;
+                          }
+                          final success = await ref.read(authProvider.notifier).resetPassword(_emailController.text);
+                          if (mounted && success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Password reset email sent!'), backgroundColor: Colors.green),
+                            );
+                          } else if (mounted) {
+                            final error = ref.read(authProvider).error;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error ?? 'Failed to send reset email'), backgroundColor: Colors.red),
+                            );
+                          }
+                        },
                         child: Text(
                           'Forgot Password?',
                           style: TextStyle(color: Theme.of(context).colorScheme.primary),
@@ -178,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     OutlinedButton.icon(
-                      onPressed: ref.watch(authProvider).isLoading ? null : () => _socialLogin('Google'),
+                      onPressed: ref.watch(authProvider).isLoading ? null : () => _handleGoogleSignIn(),
                       icon: const Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
                       label: const Text('Continue with Google', style: TextStyle(color: Colors.black87)),
                       style: OutlinedButton.styleFrom(

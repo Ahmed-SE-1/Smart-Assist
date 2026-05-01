@@ -26,44 +26,50 @@ class DeviceCard extends StatelessWidget {
       color: device.isOn 
           ? Theme.of(context).colorScheme.primaryContainer 
           : Theme.of(context).cardTheme.color,
-      child: InkWell(
-        onTap: onToggle,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: MergeSemantics(
+        child: Semantics(
+          label: '${device.name}', // Ye custom aawaz dega Talkback ko
+          button: true, // Batayega ke ye clickable hai
+          child: InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    _getIconForType(device.type),
-                    color: device.isOn 
-                        ? Theme.of(context).colorScheme.primary 
-                        : Colors.grey,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(
+                        _getIconForType(device.type),
+                        color: device.isOn
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey,
+                      ),
+                      Switch(
+                        value: device.isOn,
+                        onChanged: (val) => onToggle(),
+                      ),
+                    ],
                   ),
-                  Switch(
-                    value: device.isOn,
-                    onChanged: (val) => onToggle(),
+                  const Spacer(),
+                  Text(
+                    device.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    device.isOn ? 'ON' : 'OFF',
+                    style: TextStyle(
+                      color: device.isOn
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey,
+                    ),
                   ),
                 ],
               ),
-              const Spacer(),
-              Text(
-                device.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                device.isOn ? 'ON' : 'OFF',
-                style: TextStyle(
-                  color: device.isOn 
-                      ? Theme.of(context).colorScheme.primary 
-                      : Colors.grey,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
