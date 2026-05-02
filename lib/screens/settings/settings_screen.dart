@@ -118,19 +118,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _showAccessibilityDialog() async {
     await showDialog(
       context: context,
-      builder: (context) => Consumer( // Consumer add kiya taake global state read ho
+      builder: (context) => Consumer(
           builder: (context, ref, child) {
-            // Riverpod se current status uthaya
+            // Riverpod se dono ka current status uthaya
             final isVoiceEnabled = ref.watch(voiceFeedbackProvider);
+            final isTextEnabled = ref.watch(showTextFeedbackProvider);
 
             return AlertDialog(
               title: Semantics(
                 header: true,
-                child: Text('Accessibility Settings'),
+                child: const Text('Accessibility Settings'),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 1. Awaaz (Voice Feedback) ka Switch
                   Semantics(
                     label: 'Toggle Voice Feedback',
                     child: SwitchListTile(
@@ -138,10 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: const Text('App will speak when actions are performed'),
                       value: isVoiceEnabled,
                       onChanged: (val) {
-                        // Provider update kiya
                         ref.read(voiceFeedbackProvider.notifier).state = val;
-
-                        // Agar ON kiya hai toh foran demo aawaz sunao
                         if (val) {
                           ref.read(ttsServiceProvider).speak("Voice feedback is now enabled");
                         }
@@ -149,7 +148,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       activeColor: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  // Alert sound wali tile waise hi rahegi
+
+                  const Divider(), // Dono options ke darmiyan line
+
+                  // 2. NAYA: Text (Visual Feedback) ka Switch
+                  Semantics(
+                    label: 'Toggle Visual Text Feedback',
+                    child: SwitchListTile(
+                      title: const Text('Show Visual Text'),
+                      subtitle: const Text('Display voice commands and feedback on screen'),
+                      value: isTextEnabled,
+                      onChanged: (val) {
+                        ref.read(showTextFeedbackProvider.notifier).state = val;
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                 ],
               ),
               actions: [
