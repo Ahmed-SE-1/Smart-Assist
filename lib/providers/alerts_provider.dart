@@ -12,7 +12,16 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
 
   // Generate alerts from automation-triggered logs
   for (final log in logs.take(20)) {
-    if (log.method == 'automation') {
+    if (log.method == 'automation_alert') {
+      alerts.add(SmartAlert(
+        id: 'alert_${log.id}',
+        title: 'Critical Alert!',
+        description: '${log.deviceName} broke the rule: ${log.action}',
+        timestamp: log.timestamp,
+        severity: AlertSeverity.critical, // Laal rang mein show hoga
+      ));
+    }
+    else if (log.method == 'automation') {
       alerts.add(SmartAlert(
         id: 'alert_${log.id}',
         title: '${log.deviceName} ${log.action}',
