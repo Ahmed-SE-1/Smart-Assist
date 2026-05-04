@@ -1,10 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../models/user.dart';
 import '../services/local_storage_service.dart';
+import './automation_provider.dart';
+import './smart_home_provider.dart';
 import 'user_provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase;
-import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthState {
   final bool isAuthenticated;
@@ -214,6 +216,13 @@ class AuthNotifier extends Notifier<AuthState> {
     await _auth.signOut();
     await _googleSignIn.signOut();
     ref.read(userProvider.notifier).clearUser();
+
+    // NAYA: Riverpod providers ko reset karein taake purane user ka data RAM se nikal jaye
+    ref.invalidate(roomsProvider);
+    ref.invalidate(devicesProvider);
+    ref.invalidate(activityLogProvider);
+    ref.invalidate(automationProvider); // Automation data bhi reset hoga
+
     state = state.copyWith(isAuthenticated: false);
   }
 

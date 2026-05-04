@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:firebase_auth/firebase_auth.dart'; // NAYA: Firebase Auth Import
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
+import '../models/activity_log.dart';
 import '../models/device.dart';
 import '../models/room.dart';
-import '../models/activity_log.dart';
 import '../services/iot_simulation_service.dart';
 import 'service_providers.dart';
 
@@ -17,7 +20,13 @@ const _uuid = Uuid();
 
 class RoomsNotifier extends Notifier<List<Room>> {
   int _nodeCounter = 0;
-  static const _storageKey = 'saved_rooms_db';
+
+  // NAYA: Har user ke liye unique storage key
+  String get _storageKey {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return '${uid}_saved_rooms_db';
+  }
 
   @override
   List<Room> build() {
@@ -101,7 +110,13 @@ final roomsProvider = NotifierProvider<RoomsNotifier, List<Room>>(RoomsNotifier.
 
 class DevicesNotifier extends Notifier<List<Device>> {
   Timer? _sensorTimer;
-  static const _storageKey = 'saved_devices_db';
+
+  // NAYA: Har user ke liye unique storage key
+  String get _storageKey {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return '${uid}_saved_devices_db';
+  }
 
   @override
   List<Device> build() {

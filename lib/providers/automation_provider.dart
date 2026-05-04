@@ -1,6 +1,11 @@
 import 'dart:async';
+import 'dart:convert'; // NAYA: JSON encoding/decoding ke liye
+
+import 'package:firebase_auth/firebase_auth.dart'; // NAYA: User ID get karne ke liye
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // NAYA: Local storage ke liye
 import 'package:uuid/uuid.dart';
+
 import '../models/automation_rule.dart';
 import '../services/hardware_alert_service.dart';
 import 'smart_home_provider.dart';
@@ -10,11 +15,38 @@ const _uuid = Uuid();
 class AutomationNotifier extends Notifier<List<AutomationRule>> {
   Timer? _evaluationTimer;
 
+  // NAYA: Har user ke liye unique automation storage key
+  String get _storageKey {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return '${uid}_saved_automation_db';
+  }
+
   @override
   List<AutomationRule> build() {
+    _loadRules(); // NAYA: App start hotay hi rules load hongay
     _startEvaluation();
     ref.onDispose(() => _evaluationTimer?.cancel());
-    return []; // Yahan aap chahain toh default rules rakh saktay hain
+    return [];
+  }
+
+  // === NAYA: DATA LOAD KARNE KA FUNCTION ===
+  Future<void> _loadRules() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_storageKey);
+    if (data != null) {
+      final List decoded = jsonDecode(data);
+      state = decoded.map((e) => AutomationRule.fromMap(e)).toList();
+    } else {
+      state = [];
+    }
+  }
+
+  // === NAYA: DATA SAVE KARNE KA FUNCTION ===
+  Future<void> _saveRules() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(state.map((r) => r.toMap()).toList());
+    await prefs.setString(_storageKey, encoded);
   }
 
   void _startEvaluation() {
@@ -50,9 +82,14 @@ class AutomationNotifier extends Notifier<List<AutomationRule>> {
       else if (rule.property == 'state') currentValue = targetDevice.isOn ? 1.0 : 0.0;
 
       bool conditionMet = false;
-      if (rule.operator == '>') conditionMet = currentValue > rule.value;
-      else if (rule.operator == '<') conditionMet = currentValue < rule.value;
-      else if (rule.operator == '==') conditionMet = currentValue == rule.value;
+      if (!targetDevice.isOn && rule.property != 'state') {
+        conditionMet = false;
+      } else {
+        // Agar device ON hai, ya phir rule hi ON/OFF check karne ka hai, tab limit check karo
+        if (rule.operator == '>') conditionMet = currentValue > rule.value;
+        else if (rule.operator == '<') conditionMet = currentValue < rule.value;
+        else if (rule.operator == '==') conditionMet = currentValue == rule.value;
+      }
 
       if (conditionMet) {
         bool shouldAlert = false;
@@ -101,15 +138,18 @@ class AutomationNotifier extends Notifier<List<AutomationRule>> {
 
     if (stateChanged) {
       state = updatedRules;
+      _saveRules(); // NAYA: Data save hoga jab flag ya time update hoga
     }
   }
 
   void toggleRule(String ruleId) {
     state = state.map((r) => r.id == ruleId ? r.copyWith(isActive: !r.isActive) : r).toList();
+    _saveRules(); // NAYA: Data save hoga
   }
 
   void removeRule(String ruleId) {
     state = state.where((r) => r.id != ruleId).toList();
+    _saveRules(); // NAYA: Data save hoga
   }
 
   void addOrUpdateRule({
@@ -139,6 +179,8 @@ class AutomationNotifier extends Notifier<List<AutomationRule>> {
       // Add New
       state = [...state, rule];
     }
+
+    _saveRules(); // NAYA: Data save hoga
   }
 }
 
