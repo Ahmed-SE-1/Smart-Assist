@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:torch_light/torch_light.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart'; // Naya package
@@ -37,7 +38,7 @@ class HardwareAlertService {
         await Future.delayed(const Duration(milliseconds: 300));
       }
     } catch (e) {
-      print("Alert Hardware Error: $e");
+      debugPrint("Alert Hardware Error: $e");
     } finally {
       _isAlerting = false;
     }

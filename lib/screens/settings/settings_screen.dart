@@ -9,6 +9,8 @@ import '../../providers/accessibility_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 
+/// The screen where users can manage their profile details, app preferences, and view support options.
+/// Provides access to the Accessibility settings and Automation Rules.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -17,6 +19,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  
+  /// Opens a modal dialog allowing the user to update their Name and Profile Picture.
   Future<void> _editProfileDialog() async {
     final user = ref.read(userProvider);
     if (user == null) return;
@@ -28,7 +32,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Profile'),
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -42,35 +48,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     });
                   }
                 },
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: _getAvatarImage(currentAvatarUrl),
-                  child: currentAvatarUrl == null || currentAvatarUrl!.isEmpty
-                      ? const Icon(Icons.camera_alt, color: Colors.grey)
-                      : null,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: _getAvatarImage(currentAvatarUrl),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Color(0xFF6C5CE7), shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text('Tap to change photo', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.person_outline),
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: user.email,
-                decoration: const InputDecoration(labelText: 'Email', enabled: false),
+                decoration: InputDecoration(
+                  labelText: 'Email Address',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.email_outlined),
+                ),
                 style: const TextStyle(color: Colors.grey),
                 enabled: false,
               ),
             ],
           ),
+          actionsPadding: const EdgeInsets.all(24),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -84,7 +108,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SnackBar(content: Text('Profile updated'), backgroundColor: Colors.green),
                 );
               },
-              child: const Text('Save'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Save Changes'),
             ),
           ],
         ),
@@ -92,6 +120,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Determines how to render the user's avatar.
+  /// Handles fallback network images, real web URLs, and local file paths.
   ImageProvider _getAvatarImage(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return const NetworkImage('https://i.pravatar.cc/150?img=11');
@@ -102,76 +132,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  bool _voiceFeedbackEnabled = false;
-  bool _alertSoundEnabled = false;
-
   @override
   void initState() {
     super.initState();
-    _loadAccessibilitySettings();
   }
 
-  Future<void> _loadAccessibilitySettings() async {
-    // Assuming SharedPreferences is used directly here or via a service
-    // Defaulting to simple local state for now
-    // A proper implementation would load from local_storage_service
-  }
-
+  /// Displays the Accessibility settings modal where users can toggle Voice and Text Feedback.
   Future<void> _showAccessibilityDialog() async {
     await showDialog(
       context: context,
       builder: (context) => Consumer(
           builder: (context, ref, child) {
-            // Riverpod se dono ka current status uthaya
             final isVoiceEnabled = ref.watch(voiceFeedbackProvider);
             final isTextEnabled = ref.watch(showTextFeedbackProvider);
 
             return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               title: Semantics(
                 header: true,
-                child: const Text('Accessibility Settings'),
+                child: const Text('Accessibility', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1. Awaaz (Voice Feedback) ka Switch
                   Semantics(
                     label: 'Toggle Voice Feedback',
-                    child: SwitchListTile(
-                      title: const Text('Voice Feedback'),
-                      subtitle: const Text('App will speak when actions are performed'),
-                      value: isVoiceEnabled,
-                      onChanged: (val) {
-                        ref.read(voiceFeedbackProvider.notifier).state = val;
-                        if (val) {
-                          ref.read(ttsServiceProvider).speak("Voice feedback is now enabled");
-                        }
-                      },
-                      activeColor: Theme.of(context).colorScheme.primary,
+                    child: Container(
+                      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(16)),
+                      child: SwitchListTile(
+                        title: const Text('Voice Feedback', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: const Text('App speaks actions aloud', style: TextStyle(fontSize: 12)),
+                        value: isVoiceEnabled,
+                        onChanged: (val) {
+                          ref.read(voiceFeedbackProvider.notifier).toggle(val);
+                          if (val) ref.read(ttsServiceProvider).speak("Voice feedback is now enabled");
+                        },
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        secondary: const Icon(Icons.record_voice_over),
+                      ),
                     ),
                   ),
-
-                  const Divider(), // Dono options ke darmiyan line
-
-                  // 2. NAYA: Text (Visual Feedback) ka Switch
+                  const SizedBox(height: 12),
                   Semantics(
                     label: 'Toggle Visual Text Feedback',
-                    child: SwitchListTile(
-                      title: const Text('Show Visual Text'),
-                      subtitle: const Text('Display voice commands and feedback on screen'),
-                      value: isTextEnabled,
-                      onChanged: (val) {
-                        ref.read(showTextFeedbackProvider.notifier).state = val;
-                      },
-                      activeColor: Theme.of(context).colorScheme.primary,
+                    child: Container(
+                      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(16)),
+                      child: SwitchListTile(
+                        title: const Text('Visual Text', style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Display commands on screen', style: TextStyle(fontSize: 12)),
+                        value: isTextEnabled,
+                        onChanged: (val) {
+                          ref.read(showTextFeedbackProvider.notifier).toggle(val);
+                        },
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        secondary: const Icon(Icons.subtitles),
+                      ),
                     ),
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.all(24),
               actions: [
-                TextButton(
+                ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Done'),
                 ),
               ],
             );
@@ -180,25 +209,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Displays a simple Help & Support popup with basic instructions.
   void _showHelpDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Help & Support'),
-        content: const Column(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('SmartAssist Help Center\n', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('• How to add a room: Go to Home -> Tap Add -> Provide name.'),
-            Text('• How to use Voice: Go to Control -> Tap Mic -> Speak.'),
-            Text('• Contact us: support@smartassist.com'),
-            Text('• Version: 1.0.0'),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(16)),
+              child: const Row(
+                children: [
+                  Icon(Icons.support_agent, color: Colors.blue, size: 32),
+                  SizedBox(width: 16),
+                  Expanded(child: Text('We are here to help you!', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text('• Add a room: Go to Home -> Tap Add -> Provide name.'),
+            const SizedBox(height: 8),
+            const Text('• Voice Control: Go to Dashboard -> Tap Voice Assistant.'),
+            const SizedBox(height: 8),
+            const Text('• Automations: Add rules from the settings screen.'),
+            const SizedBox(height: 24),
+            const Center(child: Text('Version: 1.0.0', style: TextStyle(color: Colors.grey, fontSize: 12))),
           ],
         ),
+        actionsPadding: const EdgeInsets.all(24),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: const Text('Close'),
           ),
         ],
@@ -217,15 +268,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
-        title: const Text('Profile & Settings'),
+        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D3436))),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: false,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile Card
+            // Modern Profile Card
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -234,36 +287,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
                 boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6C5CE7).withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 10),
-                  ),
+                  BoxShadow(color: const Color(0xFF6C5CE7).withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10)),
                 ],
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                     child: CircleAvatar(
-                      radius: 32,
+                      radius: 36,
                       backgroundImage: _getAvatarImage(user.avatarUrl),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           user.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -273,40 +319,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.white),
+                    onPressed: _editProfileDialog,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
 
-            // Settings List
+            // Settings Group 1: Preferences
+            const Text('PREFERENCES', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            const SizedBox(height: 12),
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5))]),
               child: Column(
                 children: [
-                  _buildListTile(Icons.person_outline, 'Profile Information', onTap: _editProfileDialog),
-                  _buildDivider(),
-                  _buildListTile(Icons.accessibility_new, 'Accessibility Settings', onTap: _showAccessibilityDialog),
+                  _buildListTile(Icons.accessibility_new, 'Accessibility', onTap: _showAccessibilityDialog),
                   _buildDivider(),
                   _buildListTile(Icons.auto_awesome_mosaic_outlined, 'Automation Rules', onTap: () => context.push('/automation')),
-                  _buildDivider(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Settings Group 2: Support
+            const Text('SUPPORT', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5))]),
+              child: Column(
+                children: [
                   _buildListTile(Icons.help_outline, 'Help & Support', onTap: _showHelpDialog),
+                  _buildDivider(),
+                  _buildListTile(Icons.info_outline, 'About App', onTap: () {}),
                 ],
               ),
             ),
             const SizedBox(height: 32),
 
             // Logout Button
-            TextButton.icon(
-              onPressed: () => ref.read(authProvider.notifier).logout(),
-              icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text('Logout', style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold)),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                backgroundColor: Colors.red.withOpacity(0.1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => ref.read(authProvider.notifier).logout(),
+                icon: const Icon(Icons.logout, color: Colors.red),
+                label: const Text('Log Out', style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.withOpacity(0.1),
+                  foregroundColor: Colors.red,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
               ),
             ),
             const SizedBox(height: 40),
@@ -316,33 +381,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// A helper method to build consistent, styling list items for the Settings menus.
   Widget _buildListTile(IconData icon, String title, {VoidCallback? onTap}) {
     return Semantics(
-      button: true, // TalkBack ko batayega ke ye button hai
-      label: title, // TalkBack title parhega
-      hint: 'Double tap to open', // TalkBack user ko hint dega
+      button: true,
+      label: title,
+      hint: 'Double tap to open',
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
         leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FC),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: const Color(0xFF2D3436)),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFFF7F8FC), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: const Color(0xFF2D3436), size: 22),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF2D3436))),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF2D3436), fontSize: 16)),
+        trailing: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+          child: const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+        ),
         onTap: onTap,
-        // Exclude semantics from inner widgets to avoid double reading
-        // title aur trailing ko dubara parhne se rokne ke liye:
       ),
     );
   }
 
   Widget _buildDivider() {
     return Padding(
-      padding: const EdgeInsets.only(left: 64.0, right: 16.0),
-      child: Divider(color: Colors.grey.shade200, height: 1),
+      padding: const EdgeInsets.only(left: 68.0, right: 20.0),
+      child: Divider(color: Colors.grey.shade100, height: 1),
     );
   }
 }

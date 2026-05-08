@@ -19,22 +19,33 @@ import '../screens/features/voice/voice_screen.dart';
 
 import 'package:flutter/material.dart';
 
+/// A custom notifier that bridges Riverpod state changes with GoRouter's refresh mechanism.
+/// Whenever the [authProvider] state changes (e.g. user logs in, completes onboarding),
+/// this class notifies GoRouter to re-evaluate the redirect logic.
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
   RouterNotifier(this._ref) {
+    // Listen to changes in the Authentication state.
+    // If the user's auth status changes, we call notifyListeners() which triggers a route refresh.
     _ref.listen(authProvider, (_, __) => notifyListeners());
   }
 }
 
+/// The global routing provider that defines all the screens and navigation rules in the app.
+/// It uses the `go_router` package for declarative routing.
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = RouterNotifier(ref);
 
   return GoRouter(
-    initialLocation: '/',
-    refreshListenable: notifier,
+    initialLocation: '/', // Start at the splash screen
+    refreshListenable: notifier, // Re-route if the notifier triggers
+    
+    // The redirect logic acts as a global guard for all routes.
+    // It intercepts every navigation attempt and decides if the user is allowed to proceed.
     redirect: (context, state) {
       final authState = ref.read(authProvider);
 
+      // If the app is still booting up and loading local storage, force them to stay on the Splash screen
       if (authState.isInitializing) return '/';
       
       final isAuth = authState.isAuthenticated;
@@ -46,28 +57,39 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isGoingToOnboarding = state.matchedLocation == '/onboarding';
       final isGoingToHub = state.matchedLocation == '/hub_connection';
       final isSplash = state.matchedLocation == '/';
-      final isDashboardOrChild = state.matchedLocation.startsWith('/home') || state.matchedLocation.startsWith('/room') || state.matchedLocation == '/automation' || state.matchedLocation == '/alerts' || state.matchedLocation == '/settings';
-
+      
+      // LOGIC FOR UNAUTHENTICATED USERS:
       if (!isAuth) {
+        // If they haven't seen the welcome tutorial, force them to onboarding
         if (!hasSeenOnboarding && !isGoingToOnboarding) return '/onboarding';
+        
+        // If they have seen the tutorial, but aren't trying to log in/register, force them to login
         if (hasSeenOnboarding && !isGoingToAuth) return '/login';
-      } else {
+      } 
+      // LOGIC FOR AUTHENTICATED USERS:
+      else {
+        // If it's their first time logging in, force them to the Hub Connection screen
         if (isFirstTime && !isGoingToHub) {
           return '/hub_connection';
         }
         
-        if (!isHubConnected && isDashboardOrChild) {
+        // If their hardware hub isn't connected, force them to the Hub Connection screen
+        if (!isHubConnected && !isGoingToHub) {
           return '/hub_connection';
         }
 
+        // If they are fully setup (logged in, seen onboarding, hub connected)
+        // and they try to visit Splash, Login, or Onboarding, redirect them straight to the Home Dashboard
         if ((isGoingToAuth || isSplash || isGoingToOnboarding || isGoingToHub) && !isFirstTime && isHubConnected) {
           return '/home';
         }
       }
 
+      // Return null to allow the requested navigation to proceed normally
       return null;
     },
     routes: [
+      // --- UNPROTECTED / SETUP ROUTES ---
       GoRoute(
         path: '/hub_connection',
         builder: (context, state) => const HubConnectionScreen(),
@@ -88,6 +110,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
+      
+      // --- PROTECTED ROUTES (Require Login & Hub Connection) ---
+      // ShellRoute is used to wrap nested routes in a common persistent UI (like a bottom navigation bar)
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
@@ -95,6 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/home',
             builder: (context, state) => const DashboardScreen(),
             routes: [
+              // Nested routes inside Home (e.g., /home/gesture)
               GoRoute(
                 path: 'gesture',
                 builder: (context, state) => const GestureScreen(),
@@ -113,6 +139,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/alerts',
             builder: (context, state) => const AlertsScreen(),
           ),
+          // Dynamic route that takes the room name as a parameter (e.g., /room/Kitchen)
           GoRoute(
             path: '/room/:name',
             builder: (context, state) => RoomDetailScreen(roomName: state.pathParameters['name'] ?? 'Room'),

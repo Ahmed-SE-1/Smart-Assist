@@ -28,7 +28,7 @@ class DeviceCard extends StatelessWidget {
           : Theme.of(context).cardTheme.color,
       child: MergeSemantics(
         child: Semantics(
-          label: '${device.name}', // Ye custom aawaz dega Talkback ko
+          label: device.name, // Ye custom aawaz dega Talkback ko
           button: true, // Batayega ke ye clickable hai
           child: InkWell(
             onTap: onToggle,

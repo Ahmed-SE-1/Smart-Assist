@@ -5,6 +5,8 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../models/smart_alert.dart';
 import '../../providers/alerts_provider.dart';
 
+/// The screen that displays a history of all system alerts, warnings, and information logs.
+/// Users can filter the logs using the top category tabs.
 class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
 
@@ -18,9 +20,10 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the global alerts list from the provider
     final allAlerts = ref.watch(alertsProvider);
     
-    // Filter alerts based on selected tab
+    // Filter alerts based on the currently selected segment tab
     final List<SmartAlert> filteredAlerts = allAlerts.where((alert) {
       if (_selectedTabIndex == 0) return true; // All
       if (_selectedTabIndex == 1) return alert.severity == AlertSeverity.critical; // Critical
@@ -126,6 +129,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     );
   }
 
+  /// Maps an alert's severity to a specific visual color.
   Color _getAlertColor(AlertSeverity severity) {
     switch (severity) {
       case AlertSeverity.info: return Colors.blue;
@@ -134,6 +138,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     }
   }
 
+  /// Maps an alert's severity to a specific Material Icon.
   IconData _getAlertIcon(AlertSeverity severity) {
     switch (severity) {
       case AlertSeverity.info: return Icons.info_outline;

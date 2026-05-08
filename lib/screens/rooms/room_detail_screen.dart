@@ -5,6 +5,8 @@ import '../../models/device.dart';
 import '../../providers/smart_home_provider.dart';
 import '../../providers/accessibility_provider.dart';
 
+/// A dynamic screen that shows all the specific devices contained within a single Room.
+/// It observes the `devicesByRoomProvider` to automatically redraw when devices are added, edited, or toggled.
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomName;
   const RoomDetailScreen({super.key, required this.roomName});
@@ -97,6 +99,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Evaluates the device's [DeviceType] and returns the appropriate specialized UI Card.
   Widget _buildDeviceCard(Device device) {
     switch (device.type) {
       case DeviceType.light:
@@ -110,6 +113,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     }
   }
 
+  /// Builds a simple ON/OFF switch card for Lights.
   Widget _buildToggleDeviceCard(Device device) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -145,6 +149,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Builds an advanced card for Fans that includes both an ON/OFF toggle and a Speed slider (0-5).
   Widget _buildFanCard(Device device) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -208,6 +213,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Builds an advanced card for Air Conditioners with a Temperature slider (16°C-30°C).
   Widget _buildACDeviceCard(Device device) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -278,6 +284,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Builds a read-only card that displays live sensor telemetry (e.g. Temperature, Motion).
   Widget _buildSensorCard(Device device) {
     final isMot = device.sensorType == 'motion';
     final displayVal = isMot
@@ -324,6 +331,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Communicates with the SmartHome provider to toggle a device ON/OFF and speaks TTS feedback.
   Future<void> _toggleDevice(Device device) async {
     final success = await ref.read(devicesProvider.notifier).toggleDevice(device);
     if (mounted) {
@@ -348,6 +356,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     }
   }
 
+  /// Updates the rotational speed of a Fan device via the SmartHome provider.
   Future<void> _setFanSpeed(Device device, int speed) async {
     final success = await ref.read(devicesProvider.notifier).setFanSpeed(device, speed);
     if (!success && mounted) {
@@ -361,6 +370,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   }
   }
 
+  /// Updates the target temperature of an AC unit via the SmartHome provider.
   Future<void> _setACTemperature(Device device, int temperature) async {
     final success = await ref.read(devicesProvider.notifier).setACTemperature(device, temperature);
     if (!success && mounted) {
@@ -374,38 +384,96 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     }
   }
 
+  /// Displays a popup modal that lets the user create a brand new Smart Device inside this room.
   void _showAddDeviceDialog(String roomId) {
     final controller = TextEditingController();
     DeviceType selectedType = DeviceType.light;
+
+    IconData _getIconForType(DeviceType type) {
+      switch (type) {
+        case DeviceType.light: return Icons.lightbulb_outline;
+        case DeviceType.fan: return Icons.air;
+        case DeviceType.ac: return Icons.ac_unit;
+        case DeviceType.sensor: return Icons.sensors;
+      }
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Device'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(labelText: 'Device Name'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<DeviceType>(
-                value: selectedType,
-                decoration: const InputDecoration(labelText: 'Device Type'),
-                items: DeviceType.values.map((t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(t.name[0].toUpperCase() + t.name.substring(1)),
-                )).toList(),
-                onChanged: (v) => setDialogState(() => selectedType = v!),
-              ),
-            ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Add New Device', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Device Name',
+                    hintText: 'e.g., Ceiling Fan',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text('Select Device Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: DeviceType.values.map((type) {
+                    final isSelected = selectedType == type;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => selectedType = type),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_getIconForType(type), size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              type.name[0].toUpperCase() + type.name.substring(1),
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.grey.shade800,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           ),
+          actionsPadding: const EdgeInsets.all(24),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
+            ),
             ElevatedButton(
               onPressed: () {
+                if (controller.text.trim().isEmpty) return;
                 final error = ref.read(devicesProvider.notifier).addDevice(controller.text, selectedType, roomId);
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
@@ -416,7 +484,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   );
                 }
               },
-              child: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add Device'),
             ),
           ],
         ),
@@ -424,52 +496,108 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Displays a modal to edit the current Room's metadata (Name and Icon).
   void _showEditRoomDialog(String roomId, String currentName, String currentIconAsset) {
     final controller = TextEditingController(text: currentName);
     String selectedIcon = currentIconAsset;
+
+    final Map<String, Map<String, dynamic>> roomTypes = {
+      'living_room': {'label': 'Living Room', 'icon': Icons.chair_outlined},
+      'bed': {'label': 'Bedroom', 'icon': Icons.bed_outlined},
+      'kitchen': {'label': 'Kitchen', 'icon': Icons.kitchen_outlined},
+      'bathroom': {'label': 'Bathroom', 'icon': Icons.bathtub_outlined},
+      'garage': {'label': 'Garage', 'icon': Icons.garage_outlined},
+    };
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Edit Room'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(labelText: 'Room Name'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedIcon,
-                decoration: const InputDecoration(labelText: 'Room Type'),
-                items: const [
-                  DropdownMenuItem(value: 'living_room', child: Text('Living Room')),
-                  DropdownMenuItem(value: 'bed', child: Text('Bedroom')),
-                  DropdownMenuItem(value: 'kitchen', child: Text('Kitchen')),
-                  DropdownMenuItem(value: 'bathroom', child: Text('Bathroom')),
-                  DropdownMenuItem(value: 'garage', child: Text('Garage')),
-                ],
-                onChanged: (v) => setDialogState(() => selectedIcon = v!),
-              ),
-            ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Edit Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Room Name',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text('Select Room Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: roomTypes.entries.map((entry) {
+                    final isSelected = selectedIcon == entry.key;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => selectedIcon = entry.key),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(entry.value['icon'], size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              entry.value['label'],
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.grey.shade800,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           ),
+          actionsPadding: const EdgeInsets.all(24),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
+            ),
             ElevatedButton(
               onPressed: () {
+                if (controller.text.trim().isEmpty) return;
                 final error = ref.read(roomsProvider.notifier).editRoom(roomId, controller.text, selectedIcon);
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
                 } else {
                   Navigator.pop(ctx);
-                  // Refresh room detail screen by pushing replacement to the new route name if changed
                   if (controller.text != currentName && mounted) {
                     context.replace('/room/${controller.text}');
                   }
                 }
               },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: const Text('Save'),
             ),
           ],
@@ -478,6 +606,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// A small trailing popup menu on device cards that allows editing or deleting the specific device.
   Widget _buildDeviceOptions(Device device) {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: Colors.grey),
@@ -495,38 +624,95 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
   }
 
+  /// Displays a modal to rename or change the type of an existing Smart Device.
   void _showEditDeviceDialog(Device device) {
     final controller = TextEditingController(text: device.name);
     DeviceType selectedType = device.type;
+
+    IconData _getIconForType(DeviceType type) {
+      switch (type) {
+        case DeviceType.light: return Icons.lightbulb_outline;
+        case DeviceType.fan: return Icons.air;
+        case DeviceType.ac: return Icons.ac_unit;
+        case DeviceType.sensor: return Icons.sensors;
+      }
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Edit Device'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(labelText: 'Device Name'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<DeviceType>(
-                value: selectedType,
-                decoration: const InputDecoration(labelText: 'Device Type'),
-                items: DeviceType.values.map((t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(t.name[0].toUpperCase() + t.name.substring(1)),
-                )).toList(),
-                onChanged: (v) => setDialogState(() => selectedType = v!),
-              ),
-            ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Edit Device', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Device Name',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text('Select Device Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: DeviceType.values.map((type) {
+                    final isSelected = selectedType == type;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => selectedType = type),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_getIconForType(type), size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              type.name[0].toUpperCase() + type.name.substring(1),
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.grey.shade800,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           ),
+          actionsPadding: const EdgeInsets.all(24),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
+            ),
             ElevatedButton(
               onPressed: () {
+                if (controller.text.trim().isEmpty) return;
                 final error = ref.read(devicesProvider.notifier).editDevice(device.id, controller.text, selectedType);
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
@@ -534,6 +720,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   Navigator.pop(ctx);
                 }
               },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: const Text('Save'),
             ),
           ],

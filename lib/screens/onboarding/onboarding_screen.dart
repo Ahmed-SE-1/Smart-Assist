@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 
+/// The first screen a new user sees after installing the app.
+/// Displays a horizontally scrolling carousel of app features.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -38,10 +39,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  /// Marks onboarding as complete in SharedPreferences so it never shows again,
+  /// then triggers a state update to move the user to the login screen.
   void _finishOnboarding() {
     ref.read(authProvider.notifier).completeOnboarding();
   }
 
+  /// Advances the PageView to the next slide, or finishes if at the end.
   void _nextPage() {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(

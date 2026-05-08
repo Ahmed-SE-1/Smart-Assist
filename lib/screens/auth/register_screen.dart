@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/social_account_picker.dart';
-import '../../services/local_storage_service.dart';
 
+/// The screen where a new user can create a SmartAssist account via Email or Google.
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -13,16 +12,25 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  // A global key that uniquely identifies the Form widget and allows validation of the form.
   final _formKey = GlobalKey<FormState>();
+  
+  // Controllers to read the text input from the user.
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  
+  // Toggles for password visibility.
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
+  /// Attempts to register a new user in Firebase.
   Future<void> _register() async {
+    // 1. Validate that all fields meet requirements (length, email format, passwords match)
     if (_formKey.currentState!.validate()) {
+      
+      // 2. Call the authentication provider to attempt Firebase signup
       final success = await ref.read(authProvider.notifier).signup(
         _nameController.text,
         _emailController.text, 
@@ -31,6 +39,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       
       if (!mounted) return;
       
+      // 3. Handle response: Show error if failed, or navigate to dashboard if successful
       final authState = ref.read(authProvider);
       if (!success && authState.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -45,8 +54,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  /// Initiates the Google Sign-In OAuth flow.
   Future<void> _handleGoogleSignIn() async {
     await ref.read(authProvider.notifier).signInWithGoogle();
+    
     if (!mounted) return;
 
     final authState = ref.read(authProvider);
@@ -82,6 +93,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Main Welcome Header
                     Text(
                       'Create Account',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -97,6 +109,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 40),
+                    
+                    // --- Full Name Input Field ---
                     _buildTextField(
                       controller: _nameController,
                       hint: 'Full Name',
@@ -104,6 +118,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       validator: (val) => val != null && val.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
+                    
+                    // --- Email Input Field ---
                     _buildTextField(
                       controller: _emailController,
                       hint: 'Email Address',
@@ -111,6 +127,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       validator: (val) => val != null && !val.contains('@') ? 'Invalid email' : null,
                     ),
                     const SizedBox(height: 16),
+                    
+                    // --- Password Input Field ---
                     _buildTextField(
                       controller: _passwordController,
                       hint: 'Password',
@@ -120,15 +138,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       validator: (val) => val != null && val.length < 6 ? 'Too short' : null,
                     ),
                     const SizedBox(height: 16),
+                    
+                    // --- Confirm Password Input Field ---
                     _buildTextField(
                       controller: _confirmController,
                       hint: 'Confirm Password',
                       icon: Icons.lock_outline,
                       obscure: _obscureConfirm,
                       onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      // Validates that both passwords match exactly
                       validator: (val) => val != _passwordController.text ? 'Passwords do not match' : null,
                     ),
                     const SizedBox(height: 32),
+                    
+                    // --- Register Button / Loading Spinner ---
                     if (ref.watch(authProvider).isLoading)
                       const Center(child: CircularProgressIndicator())
                     else
@@ -137,6 +160,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         child: const Text('Sign Up', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     const SizedBox(height: 32),
+                    
+                    // --- Separator ---
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -148,6 +173,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
+                    
+                    // --- Google Auth Button ---
                     OutlinedButton.icon(
                       onPressed: ref.watch(authProvider).isLoading ? null : () => _handleGoogleSignIn(),
                       icon: const Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
@@ -160,6 +187,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
+                    
+                    // --- Navigate to Login ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -186,6 +215,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  /// A helper widget to reduce boilerplate code for creating TextFields.
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,

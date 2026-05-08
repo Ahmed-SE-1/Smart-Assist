@@ -8,9 +8,12 @@ import '../../models/device.dart';
 import '../../providers/smart_home_provider.dart';
 import '../../providers/user_provider.dart';
 
+/// The primary Home screen of the application.
+/// Displays user statistics, saved rooms, and quick access feature controls.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
+  /// Maps a room type string (saved in DB) to a visual Material Icon.
   IconData _roomIcon(String iconAsset) {
     switch (iconAsset) {
       case 'living_room': return Icons.chair_outlined;
@@ -22,6 +25,8 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
+  /// Determines how to render the user's avatar.
+  /// Handles fallback network images, real web URLs, and local file paths.
   ImageProvider _getAvatarImage(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return const NetworkImage('https://i.pravatar.cc/150?img=11');
@@ -32,6 +37,8 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
+  /// Returns a unique vibrant color gradient based on the room's index in the list.
+  /// Gives the horizontal room list a modern, colorful look.
   List<Color> _roomGradient(int index) {
     const gradients = [
       [Color(0xFF6C5CE7), Color(0xFF8E84F3)],
@@ -45,9 +52,12 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 1. Watch Riverpod providers so the Dashboard rebuilds instantly if data changes.
     final user = ref.watch(userProvider);
     final rooms = ref.watch(roomsProvider);
     final devices = ref.watch(devicesProvider);
+    
+    // 2. Computed statistics for the top cards
     final activeCount = ref.watch(activeDeviceCountProvider);
     final temperature = ref.watch(temperatureProvider);
 
@@ -229,41 +239,95 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// Displays a modal popup to let the user create a new Room.
   void _showAddRoomDialog(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
     String selectedIcon = 'living_room';
+
+    final Map<String, Map<String, dynamic>> roomTypes = {
+      'living_room': {'label': 'Living Room', 'icon': Icons.chair_outlined},
+      'bed': {'label': 'Bedroom', 'icon': Icons.bed_outlined},
+      'kitchen': {'label': 'Kitchen', 'icon': Icons.kitchen_outlined},
+      'bathroom': {'label': 'Bathroom', 'icon': Icons.bathtub_outlined},
+      'garage': {'label': 'Garage', 'icon': Icons.garage_outlined},
+    };
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Room'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(labelText: 'Room Name'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedIcon,
-                decoration: const InputDecoration(labelText: 'Room Type'),
-                items: const [
-                  DropdownMenuItem(value: 'living_room', child: Text('Living Room')),
-                  DropdownMenuItem(value: 'bed', child: Text('Bedroom')),
-                  DropdownMenuItem(value: 'kitchen', child: Text('Kitchen')),
-                  DropdownMenuItem(value: 'bathroom', child: Text('Bathroom')),
-                  DropdownMenuItem(value: 'garage', child: Text('Garage')),
-                ],
-                onChanged: (v) => setDialogState(() => selectedIcon = v!),
-              ),
-            ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Add New Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Room Name',
+                    hintText: 'e.g., Master Bedroom',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text('Select Room Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: roomTypes.entries.map((entry) {
+                    final isSelected = selectedIcon == entry.key;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => selectedIcon = entry.key),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(entry.value['icon'], size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              entry.value['label'],
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.grey.shade800,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           ),
+          actionsPadding: const EdgeInsets.all(24),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
+            ),
             ElevatedButton(
               onPressed: () {
+                if (controller.text.trim().isEmpty) return;
                 final error = ref.read(roomsProvider.notifier).addRoom(controller.text, selectedIcon);
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
@@ -274,7 +338,11 @@ class DashboardScreen extends ConsumerWidget {
                   );
                 }
               },
-              child: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add Room'),
             ),
           ],
         ),
@@ -282,6 +350,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  /// A generic builder for the colorful Room Cards seen in the horizontal list.
   Widget _buildRoomCard(BuildContext context, {required String title, required String devices, required IconData icon, required List<Color> gradient, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -335,6 +404,7 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
+  /// Builds the white rounded square cards used for Quick Controls (e.g. Voice Assistant).
   Widget _buildControlFeatureCard(BuildContext context, {required String title, required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,

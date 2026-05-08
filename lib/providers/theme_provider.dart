@@ -29,7 +29,11 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
   @override
   ThemeSettings build() {
     Future.microtask(_loadSettings);
-    return const ThemeSettings(isDarkMode: false, isHighContrast: false, fontSizeFactor: 1.0);
+    return const ThemeSettings(
+      isDarkMode: false,
+      isHighContrast: false,
+      fontSizeFactor: 1.0,
+    );
   }
 
   Future<void> _loadSettings() async {
@@ -62,4 +66,6 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
   }
 }
 
-final themeProvider = NotifierProvider<ThemeNotifier, ThemeSettings>(ThemeNotifier.new);
+final themeProvider = NotifierProvider<ThemeNotifier, ThemeSettings>(
+  ThemeNotifier.new,
+);

@@ -2,11 +2,48 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-// Pehle wala TTS On/Off provider
-final voiceFeedbackProvider = StateProvider<bool>((ref) => false);
+import 'package:shared_preferences/shared_preferences.dart';
 
-// NAYA: Text screen par show karne ka provider (Subtitles)
-final showTextFeedbackProvider = StateProvider<bool>((ref) => true);
+class VoiceFeedbackNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    _load();
+    return false;
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('voiceFeedbackEnabled') ?? false;
+  }
+
+  Future<void> toggle(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('voiceFeedbackEnabled', value);
+  }
+}
+
+class ShowTextFeedbackNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    _load();
+    return true; // Default to true
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('visualAlertsEnabled') ?? true;
+  }
+
+  Future<void> toggle(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('visualAlertsEnabled', value);
+  }
+}
+
+final voiceFeedbackProvider = NotifierProvider<VoiceFeedbackNotifier, bool>(VoiceFeedbackNotifier.new);
+final showTextFeedbackProvider = NotifierProvider<ShowTextFeedbackNotifier, bool>(ShowTextFeedbackNotifier.new);
 
 // Ye service actual text ko aawaz mein convert karegi
 final ttsServiceProvider = Provider<TtsService>((ref) {

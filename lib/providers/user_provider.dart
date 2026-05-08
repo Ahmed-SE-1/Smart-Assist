@@ -14,10 +14,10 @@ class UserNotifier extends Notifier<User?> {
     final user = await _storage.getUser();
     state = user;
   }
-  
+
   void setUser(User user) {
-      state = user;
-      _storage.saveUser(user);
+    state = user;
+    _storage.saveUser(user);
   }
 
   Future<void> updateUser({

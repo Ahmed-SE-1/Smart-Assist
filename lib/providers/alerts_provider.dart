@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/smart_alert.dart';
-import '../models/activity_log.dart';
 import 'smart_home_provider.dart';
 
 /// Generates alerts from activity logs and sensor data.
@@ -13,22 +12,26 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
   // Generate alerts from automation-triggered logs
   for (final log in logs.take(20)) {
     if (log.method == 'automation_alert') {
-      alerts.add(SmartAlert(
-        id: 'alert_${log.id}',
-        title: 'Critical Alert!',
-        description: '${log.deviceName} broke the rule: ${log.action}',
-        timestamp: log.timestamp,
-        severity: AlertSeverity.critical, // Laal rang mein show hoga
-      ));
-    }
-    else if (log.method == 'automation') {
-      alerts.add(SmartAlert(
-        id: 'alert_${log.id}',
-        title: '${log.deviceName} ${log.action}',
-        description: 'Automation triggered: ${log.deviceName} was turned ${log.action} automatically.',
-        timestamp: log.timestamp,
-        severity: AlertSeverity.info,
-      ));
+      alerts.add(
+        SmartAlert(
+          id: 'alert_${log.id}',
+          title: 'Critical Alert!',
+          description: '${log.deviceName} broke the rule: ${log.action}',
+          timestamp: log.timestamp,
+          severity: AlertSeverity.critical, // Laal rang mein show hoga
+        ),
+      );
+    } else if (log.method == 'automation') {
+      alerts.add(
+        SmartAlert(
+          id: 'alert_${log.id}',
+          title: '${log.deviceName} ${log.action}',
+          description:
+              'Automation triggered: ${log.deviceName} was turned ${log.action} automatically.',
+          timestamp: log.timestamp,
+          severity: AlertSeverity.info,
+        ),
+      );
     }
   }
 
@@ -36,22 +39,27 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
   for (final device in devices) {
     if (device.type.name == 'sensor') {
       if (device.sensorType == 'temperature' && device.sensorValue > 35) {
-        alerts.add(SmartAlert(
-          id: 'temp_alert_${device.id}',
-          title: 'High Temperature Warning',
-          description: '${device.name} reading ${device.sensorValue.toStringAsFixed(1)}°C — above safe threshold.',
-          timestamp: DateTime.now(),
-          severity: AlertSeverity.warning,
-        ));
+        alerts.add(
+          SmartAlert(
+            id: 'temp_alert_${device.id}',
+            title: 'High Temperature Warning',
+            description:
+                '${device.name} reading ${device.sensorValue.toStringAsFixed(1)}°C — above safe threshold.',
+            timestamp: DateTime.now(),
+            severity: AlertSeverity.warning,
+          ),
+        );
       }
       if (device.sensorType == 'motion' && device.sensorValue > 0.5) {
-        alerts.add(SmartAlert(
-          id: 'motion_alert_${device.id}',
-          title: 'Motion Detected',
-          description: '${device.name} detected movement.',
-          timestamp: DateTime.now(),
-          severity: AlertSeverity.warning,
-        ));
+        alerts.add(
+          SmartAlert(
+            id: 'motion_alert_${device.id}',
+            title: 'Motion Detected',
+            description: '${device.name} detected movement.',
+            timestamp: DateTime.now(),
+            severity: AlertSeverity.warning,
+          ),
+        );
       }
     }
   }

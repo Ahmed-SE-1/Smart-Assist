@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/social_account_picker.dart';
-import '../../services/local_storage_service.dart';
 
+/// The screen where users can authenticate via Email/Password or Google Sign-In.
+/// Uses a [ConsumerStatefulWidget] so it can read from and write to Riverpod providers.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,19 +13,31 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  // A global key that uniquely identifies the Form widget and allows validation of the form.
   final _formKey = GlobalKey<FormState>();
+  
+  // Controllers to read the text input for Email and Password fields.
   final _emailController = TextEditingController(text: 'demo@example.com');
   final _passwordController = TextEditingController(text: 'password123');
+  
+  // Controls the visibility of the password characters.
   bool _obscurePassword = true;
 
+  /// Attempts to log the user in using the provided email and password.
   Future<void> _login() async {
+    // 1. Check if the inputs pass the validation rules defined in the TextFormFields
     if (_formKey.currentState!.validate()) {
+      
+      // 2. Call the authentication provider to attempt Firebase login
       final success = await ref.read(authProvider.notifier).login(
             _emailController.text,
             _passwordController.text,
           );
+          
+      // 3. Ensure the widget is still in the tree before updating UI
       if (!mounted) return;
 
+      // 4. Handle response: Show error if failed, or navigate to dashboard if successful
       final authState = ref.read(authProvider);
       if (!success && authState.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -37,14 +49,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// Initiates the Google Sign-In OAuth flow.
   Future<void> _handleGoogleSignIn() async {
+    // Call the Google Auth method in the provider
     await ref.read(authProvider.notifier).signInWithGoogle();
+    
     if (!mounted) return;
 
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated) {
+      // If successful, navigate to the main dashboard
       context.go('/home');
     } else if (authState.error != null) {
+      // Show snackbar if the user cancels or an error occurs
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authState.error!), backgroundColor: Colors.red),
       );
@@ -53,6 +70,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the authProvider to react to loading states (e.g. showing a spinner while logging in)
     final authState = ref.watch(authProvider);
 
     return Scaffold(
@@ -70,6 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 40),
+                    // Main Welcome Header
                     Text(
                       'Welcome Back!',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -85,6 +104,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 50),
+                    
+                    // --- Email Input Field ---
                     TextFormField(
                       controller: _emailController,
                       decoration: InputDecoration(
@@ -97,9 +118,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           borderSide: BorderSide.none,
                         ),
                       ),
+                      // Validates that field isn't empty and contains an '@'
                       validator: (val) => val == null || val.isEmpty ? 'Required' : (!val.contains('@') ? 'Invalid email' : null),
                     ),
                     const SizedBox(height: 16),
+                    
+                    // --- Password Input Field ---
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -110,6 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             _obscurePassword ? Icons.visibility_off : Icons.visibility,
                             color: Colors.grey,
                           ),
+                          // Toggles visibility of the password
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                         hintText: 'Password',
@@ -123,6 +148,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       validator: (val) => val == null || val.isEmpty ? 'Required' : (val.length < 6 ? 'Too short' : null),
                     ),
                     const SizedBox(height: 8),
+                    
+                    // --- Forgot Password Button ---
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
@@ -133,6 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             );
                             return;
                           }
+                          // Request Firebase to send a reset link to the provided email
                           final success = await ref.read(authProvider.notifier).resetPassword(_emailController.text);
                           if (mounted && success) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +180,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    
+                    // --- Login Button / Loading Spinner ---
                     if (authState.isLoading)
                       const Center(child: CircularProgressIndicator())
                     else
@@ -160,6 +190,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     const SizedBox(height: 40),
+                    
+                    // --- Separator ---
                     Row(
                       children: [
                         Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -171,6 +203,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
+                    
+                    // --- Google Auth Button ---
                     OutlinedButton.icon(
                       onPressed: ref.watch(authProvider).isLoading ? null : () => _handleGoogleSignIn(),
                       icon: const Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
@@ -183,6 +217,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 40),
+                    
+                    // --- Navigate to Sign Up ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
