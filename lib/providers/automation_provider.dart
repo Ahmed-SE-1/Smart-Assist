@@ -152,6 +152,12 @@ class AutomationNotifier extends Notifier<List<AutomationRule>> {
     _saveRules(); // NAYA: Data save hoga
   }
 
+  // NAYA: Ye function us waqt call hoga jab koi device delete hogi
+  void removeRulesForDevice(String deviceId) {
+    state = state.where((r) => r.targetDeviceId != deviceId).toList();
+    _saveRules();
+  }
+
   void addOrUpdateRule({
     String? existingId,
     required String name,

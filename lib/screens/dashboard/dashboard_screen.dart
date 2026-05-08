@@ -1,10 +1,12 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/smart_home_provider.dart';
+
 import '../../models/device.dart';
+import '../../providers/smart_home_provider.dart';
+import '../../providers/user_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});

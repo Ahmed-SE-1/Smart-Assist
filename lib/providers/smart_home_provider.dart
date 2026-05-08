@@ -10,6 +10,7 @@ import '../models/activity_log.dart';
 import '../models/device.dart';
 import '../models/room.dart';
 import '../services/iot_simulation_service.dart';
+import 'automation_provider.dart';
 import 'service_providers.dart';
 
 const _uuid = Uuid();
@@ -21,44 +22,35 @@ const _uuid = Uuid();
 class RoomsNotifier extends Notifier<List<Room>> {
   int _nodeCounter = 0;
 
-  // NAYA: Har user ke liye unique storage key
-  String get _storageKey {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid ?? 'guest';
-    return '${uid}_saved_rooms_db';
-  }
+  String getStorageKey(String uid) => '${uid}_saved_rooms_db';
 
   @override
   List<Room> build() {
-    _loadRooms();
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    _loadRooms(uid);
     return [];
   }
 
-  Future<void> _loadRooms() async {
+  Future<void> _loadRooms(String uid) async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_storageKey);
+    final data = prefs.getString(getStorageKey(uid));
     if (data != null) {
       final List decoded = jsonDecode(data);
       state = decoded.map((e) => Room.fromMap(e)).toList();
-      _nodeCounter = state.length;
     } else {
-      _nodeCounter = 3;
-      state = const [
-        Room(id: 'r1', name: 'Living Room', iconAsset: 'living_room', esp32NodeId: 'NODE_001'),
-        Room(id: 'r2', name: 'Bedroom', iconAsset: 'bed', esp32NodeId: 'NODE_002'),
-        Room(id: 'r3', name: 'Kitchen', iconAsset: 'kitchen', esp32NodeId: 'NODE_003'),
-      ];
-      _saveRooms();
+      state = [];
     }
   }
 
   Future<void> _saveRooms() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(state.map((r) => r.toMap()).toList());
-    await prefs.setString(_storageKey, encoded);
+    await prefs.setString(getStorageKey(uid), encoded);
   }
 
-  /// Add a room (max 5). Returns error string or null on success.
   String? addRoom(String name, String iconAsset) {
     if (name.trim().isEmpty) return 'Room name cannot be empty';
     if (state.length >= 5) return 'Maximum 5 rooms allowed';
@@ -97,7 +89,6 @@ class RoomsNotifier extends Notifier<List<Room>> {
   void removeRoom(String roomId) {
     state = state.where((r) => r.id != roomId).toList();
     _saveRooms();
-    // Also remove devices in that room
     ref.read(devicesProvider.notifier).removeDevicesInRoom(roomId);
   }
 }
@@ -111,51 +102,47 @@ final roomsProvider = NotifierProvider<RoomsNotifier, List<Room>>(RoomsNotifier.
 class DevicesNotifier extends Notifier<List<Device>> {
   Timer? _sensorTimer;
 
-  // NAYA: Har user ke liye unique storage key
-  String get _storageKey {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid ?? 'guest';
-    return '${uid}_saved_devices_db';
-  }
+  // KEY LOGIC: Isay build ke andar use karenge
+  String getStorageKey(String uid) => '${uid}_saved_devices_db';
 
   @override
   List<Device> build() {
-    _loadDevices();
+    // 1. User ki ID ko watch karein
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
 
-    // Start sensor simulation
+    // 2. Devices load karein (Async load)
+    _loadDevices(uid);
+
+    // 3. Sensor simulation start karein
     _startSensorSimulation();
 
     ref.onDispose(() {
       _sensorTimer?.cancel();
     });
 
-    return [];
+    return []; // Start with empty, then _loadDevices updates state
   }
 
-  Future<void> _loadDevices() async {
+  Future<void> _loadDevices(String uid) async {
     final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(_storageKey);
+    final data = prefs.getString(getStorageKey(uid));
+
     if (data != null) {
       final List decoded = jsonDecode(data);
       state = decoded.map((e) => Device.fromMap(e)).toList();
     } else {
-      state = const [
-        Device(id: 'd1', name: 'Main Light', type: DeviceType.light, roomId: 'r1', isOn: true),
-        Device(id: 'd2', name: 'Ceiling Fan', type: DeviceType.fan, roomId: 'r1', isOn: false, fanSpeed: 0),
-        Device(id: 'd3', name: 'Night Lamp', type: DeviceType.light, roomId: 'r2', isOn: false),
-        Device(id: 'd4', name: 'AC Unit', type: DeviceType.ac, roomId: 'r2', isOn: true, acTemperature: 24),
-        Device(id: 'd5', name: 'Kitchen Light', type: DeviceType.light, roomId: 'r3', isOn: false),
-        Device(id: 'd6', name: 'Temp Sensor', type: DeviceType.sensor, roomId: 'r1', sensorValue: 28.0, sensorType: 'temperature'),
-        Device(id: 'd7', name: 'Motion Sensor', type: DeviceType.sensor, roomId: 'r3', sensorValue: 0.0, sensorType: 'motion'),
-      ];
-      _saveDevices();
+      state = [];
     }
   }
 
   Future<void> _saveDevices() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(state.map((d) => d.toMap()).toList());
-    await prefs.setString(_storageKey, encoded);
+    await prefs.setString(getStorageKey(uid), encoded);
   }
 
   void _startSensorSimulation() {
@@ -181,7 +168,6 @@ class DevicesNotifier extends Notifier<List<Device>> {
     });
   }
 
-  /// Add a device to a room.
   String? addDevice(String name, DeviceType type, String roomId) {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
@@ -196,7 +182,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
     );
 
     state = [...state, device];
-    _saveDevices();
+    _saveDevices(); // Yaad se save
     return null;
   }
 
@@ -207,11 +193,10 @@ class DevicesNotifier extends Notifier<List<Device>> {
       if (d.id == id) return d.copyWith(name: name.trim(), type: type);
       return d;
     }).toList();
-    _saveDevices();
+    _saveDevices(); // Yaad se save
     return null;
   }
 
-  /// Add a sensor device with specific sensor type.
   String? addSensorDevice(String name, String roomId, String sensorType) {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
@@ -225,21 +210,32 @@ class DevicesNotifier extends Notifier<List<Device>> {
     );
 
     state = [...state, device];
-    _saveDevices();
+    _saveDevices(); // Yaad se save
     return null;
   }
 
   void removeDevice(String deviceId) {
     state = state.where((d) => d.id != deviceId).toList();
     _saveDevices();
+
+    // NAYA: Jab device delete ho toh Automation se bhi uske rules nikal do
+    ref.read(automationProvider.notifier).removeRulesForDevice(deviceId);
   }
 
   void removeDevicesInRoom(String roomId) {
+    // Pehle un devices ko dhundo jo delete hone wali hain
+    final devicesToRemove = state.where((d) => d.roomId == roomId).toList();
+
+    // Phir unko list mein se nikal do
     state = state.where((d) => d.roomId != roomId).toList();
     _saveDevices();
+
+    // NAYA: Jo devices delete hui hain, unke sab automation rules delete kardo
+    for (var device in devicesToRemove) {
+      ref.read(automationProvider.notifier).removeRulesForDevice(device.id);
+    }
   }
 
-  /// Core device control: toggle on/off with IoT pipeline simulation.
   Future<bool> toggleDevice(Device device, {String method = 'app'}) async {
     final newState = !device.isOn;
     final mqtt = ref.read(mqttServiceProvider);
@@ -255,8 +251,8 @@ class DevicesNotifier extends Notifier<List<Device>> {
         if (d.id == device.id) return d.copyWith(isOn: newState);
         return d;
       }).toList();
+      _saveDevices(); // NAYA: Toggle hone par ab local storage update hogi!
 
-      // Log the action
       ref.read(activityLogProvider.notifier).addLog(
         deviceId: device.id,
         deviceName: device.name,
@@ -265,81 +261,57 @@ class DevicesNotifier extends Notifier<List<Device>> {
         method: method,
       );
     }
-
     return result.success;
   }
 
-  /// Set fan speed with IoT pipeline simulation.
   Future<bool> setFanSpeed(Device device, int speed, {String method = 'app'}) async {
     final mqtt = ref.read(mqttServiceProvider);
-
-    final result = await mqtt.publishCommand(
-      device: device,
-      action: 'SPEED_$speed',
-      method: method,
-    );
+    final result = await mqtt.publishCommand(device: device, action: 'SPEED_$speed', method: method);
 
     if (result.success) {
       state = state.map((d) {
         if (d.id == device.id) return d.copyWith(fanSpeed: speed, isOn: speed > 0);
         return d;
       }).toList();
+      _saveDevices(); // NAYA: Fan speed change hone par save hogi
 
       ref.read(activityLogProvider.notifier).addLog(
-        deviceId: device.id,
-        deviceName: device.name,
-        roomId: device.roomId,
-        action: 'SPEED_$speed',
-        method: method,
+        deviceId: device.id, deviceName: device.name, roomId: device.roomId, action: 'SPEED_$speed', method: method,
       );
     }
-
     return result.success;
   }
 
-  /// Set AC temperature with IoT pipeline simulation.
   Future<bool> setACTemperature(Device device, int temperature, {String method = 'app'}) async {
     final mqtt = ref.read(mqttServiceProvider);
-
-    final result = await mqtt.publishCommand(
-      device: device,
-      action: 'TEMP_$temperature',
-      method: method,
-    );
+    final result = await mqtt.publishCommand(device: device, action: 'TEMP_$temperature', method: method);
 
     if (result.success) {
       state = state.map((d) {
         if (d.id == device.id) return d.copyWith(acTemperature: temperature);
         return d;
       }).toList();
+      _saveDevices(); // NAYA: AC temp change hone par save hogi
 
       ref.read(activityLogProvider.notifier).addLog(
-        deviceId: device.id,
-        deviceName: device.name,
-        roomId: device.roomId,
-        action: 'TEMP_$temperature',
-        method: method,
+        deviceId: device.id, deviceName: device.name, roomId: device.roomId, action: 'TEMP_$temperature', method: method,
       );
     }
-
     return result.success;
   }
 
-  /// Turn a device ON directly (for automation/voice/gesture).
   Future<bool> turnOn(String deviceId, {String method = 'app'}) async {
     final device = state.firstWhere((d) => d.id == deviceId, orElse: () => throw Exception('Device not found'));
-    if (device.isOn) return true; // Already on
+    if (device.isOn) return true;
     return toggleDevice(device, method: method);
   }
 
-  /// Turn a device OFF directly (for automation/voice/gesture).
   Future<bool> turnOff(String deviceId, {String method = 'app'}) async {
     final device = state.firstWhere((d) => d.id == deviceId, orElse: () => throw Exception('Device not found'));
-    if (!device.isOn) return true; // Already off
+    if (!device.isOn) return true;
     return toggleDevice(device, method: method);
   }
 
-  /// Turn off all devices (for gesture fist action).
   Future<void> turnOffAll({String method = 'app'}) async {
     final onDevices = state.where((d) => d.isOn && d.type != DeviceType.sensor).toList();
     for (final device in onDevices) {
@@ -347,13 +319,11 @@ class DevicesNotifier extends Notifier<List<Device>> {
     }
   }
 
-  /// Find devices by name (case-insensitive, partial match).
   List<Device> findByName(String name) {
     final lower = name.toLowerCase();
     return state.where((d) => d.name.toLowerCase().contains(lower)).toList();
   }
 
-  /// Get a device by ID.
   Device? getById(String id) {
     try {
       return state.firstWhere((d) => d.id == id);
@@ -365,7 +335,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
 
 final devicesProvider = NotifierProvider<DevicesNotifier, List<Device>>(DevicesNotifier.new);
 
-// Helper provider to get devices for a specific room
+// Helper provider
 final devicesByRoomProvider = Provider.family<List<Device>, String>((ref, roomId) {
   final devices = ref.watch(devicesProvider);
   return devices.where((d) => d.roomId == roomId).toList();
