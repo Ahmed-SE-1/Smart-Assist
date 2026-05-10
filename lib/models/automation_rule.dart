@@ -10,6 +10,10 @@ class AutomationRule {
   final DateTime? lastTriggered;
   final bool isCurrentlyViolated;
 
+  // --- NAYA: Creator Details ---
+  final String creatorId;
+  final String creatorName;
+
   const AutomationRule({
     required this.id,
     required this.name,
@@ -21,6 +25,8 @@ class AutomationRule {
     this.isActive = true,
     this.lastTriggered,
     this.isCurrentlyViolated = false,
+    required this.creatorId,
+    required this.creatorName,
   });
 
   AutomationRule copyWith({
@@ -34,6 +40,8 @@ class AutomationRule {
     bool? isActive,
     DateTime? lastTriggered,
     bool? isCurrentlyViolated,
+    String? creatorId,
+    String? creatorName,
   }) {
     return AutomationRule(
       id: id ?? this.id,
@@ -46,10 +54,11 @@ class AutomationRule {
       isActive: isActive ?? this.isActive,
       lastTriggered: lastTriggered ?? this.lastTriggered,
       isCurrentlyViolated: isCurrentlyViolated ?? this.isCurrentlyViolated,
+      creatorId: creatorId ?? this.creatorId,
+      creatorName: creatorName ?? this.creatorName,
     );
   }
 
-  // --- NAYA: Model ko JSON ke liye Map mein convert karna ---
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -62,10 +71,11 @@ class AutomationRule {
       'isActive': isActive,
       'lastTriggered': lastTriggered?.toIso8601String(),
       'isCurrentlyViolated': isCurrentlyViolated,
+      'creatorId': creatorId,
+      'creatorName': creatorName,
     };
   }
 
-  // --- NAYA: JSON Map ko wapis Model mein convert karna ---
   factory AutomationRule.fromMap(Map<String, dynamic> map) {
     return AutomationRule(
       id: map['id'],
@@ -73,12 +83,13 @@ class AutomationRule {
       targetDeviceId: map['targetDeviceId'],
       property: map['property'],
       operator: map['operator'],
-      // value ko double mein securely parse karna
       value: map['value'] is int ? (map['value'] as int).toDouble() : map['value'] as double,
       action: map['action'],
       isActive: map['isActive'] ?? true,
       lastTriggered: map['lastTriggered'] != null ? DateTime.parse(map['lastTriggered']) : null,
       isCurrentlyViolated: map['isCurrentlyViolated'] ?? false,
+      creatorId: map['creatorId'] ?? '',
+      creatorName: map['creatorName'] ?? 'Unknown Member',
     );
   }
 }

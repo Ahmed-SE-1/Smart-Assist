@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart'; // NEW: For Managing Members
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // NEW: For Clipboard Copy
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../models/user.dart'; // NEW: For UserRole
 import '../../providers/accessibility_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
@@ -19,7 +22,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  
+
   /// Opens a modal dialog allowing the user to update their Name and Profile Picture.
   Future<void> _editProfileDialog() async {
     final user = ref.read(userProvider);
@@ -100,7 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onPressed: () {
                 ref.read(userProvider.notifier).updateUser(
                   name: nameController.text,
-                  email: user.email, // email remains unchanged
+                  email: user.email,
                   avatarUrl: currentAvatarUrl,
                 );
                 Navigator.pop(context);
@@ -121,7 +124,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   /// Determines how to render the user's avatar.
-  /// Handles fallback network images, real web URLs, and local file paths.
   ImageProvider _getAvatarImage(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return const NetworkImage('https://i.pravatar.cc/150?img=11');
@@ -132,12 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  /// Displays the Accessibility settings modal where users can toggle Voice and Text Feedback.
+  /// Displays the Accessibility settings modal
   Future<void> _showAccessibilityDialog() async {
     await showDialog(
       context: context,
@@ -209,7 +206,153 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Displays a simple Help & Support popup with basic instructions.
+  /// Displays the Join Code for the House Owner
+  void _showJoinCodeDialog(String? joinCode) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('House Join Code', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.vpn_key_rounded, size: 64, color: Color(0xFF6C5CE7)),
+            const SizedBox(height: 16),
+            const Text(
+              'Share this code with your family members so they can join your smart home.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C5CE7).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF6C5CE7).withOpacity(0.5), width: 2),
+              ),
+              child: Text(
+                joinCode ?? 'Error',
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF6C5CE7), letterSpacing: 8),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.all(24),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              if (joinCode != null) {
+                Clipboard.setData(ClipboardData(text: joinCode));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Code copied to clipboard!'), backgroundColor: Colors.green),
+                );
+                Navigator.pop(context);
+              }
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copy Code'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Displays the Member Management dialog for the House Owner
+  void _showManageMembersDialog(String houseId, String ownerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Manage Members', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 350,
+          child: StreamBuilder<QuerySnapshot>(
+            // Querying users who belong to this house, but excluding the owner themselves
+            stream: FirebaseFirestore.instance.collection('users').where('houseId', isEqualTo: houseId).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text('No members found.', style: TextStyle(color: Colors.grey)));
+              }
+
+              // Filter out the owner from the list
+              final members = snapshot.data!.docs.where((doc) => doc.id != ownerId).toList();
+
+              if (members.isEmpty) {
+                return const Center(child: Text('No family members have joined yet.', style: TextStyle(color: Colors.grey)));
+              }
+
+              return ListView.separated(
+                itemCount: members.length,
+                separatorBuilder: (context, index) => Divider(color: Colors.grey.shade200),
+                itemBuilder: (context, index) {
+                  final data = members[index].data() as Map<String, dynamic>;
+                  final docId = members[index].id;
+                  final isApproved = data['isApproved'] ?? false;
+                  final memberName = data['name'] ?? 'Unknown User';
+
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: isApproved ? Colors.green.shade100 : Colors.orange.shade100,
+                      child: Icon(
+                        isApproved ? Icons.person : Icons.pending_actions,
+                        color: isApproved ? Colors.green : Colors.orange,
+                      ),
+                    ),
+                    title: Text(memberName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                      isApproved ? 'Approved Member' : 'Pending Approval',
+                      style: TextStyle(color: isApproved ? Colors.green : Colors.orange, fontSize: 12),
+                    ),
+                    trailing: Switch(
+                      value: isApproved,
+                      activeColor: Colors.green,
+                      onChanged: (val) {
+                        FirebaseFirestore.instance.collection('users').doc(docId).update({'isApproved': val});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(val ? '$memberName Approved' : '$memberName Access Revoked'),
+                            backgroundColor: val ? Colors.green : Colors.orange,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actionsPadding: const EdgeInsets.all(24),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showHelpDialog() {
     showDialog(
       context: context,
@@ -260,9 +403,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userProvider);
-    
+
     if (user == null) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -327,6 +470,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 32),
+
+            // --- NEW: HOUSEHOLD MANAGEMENT (ONLY FOR OWNER) ---
+            if (user.role == UserRole.owner) ...[
+              const Text('HOUSEHOLD MANAGEMENT', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5))]),
+                child: Column(
+                  children: [
+                    _buildListTile(Icons.vpn_key_outlined, 'House Join Code', onTap: () => _showJoinCodeDialog(user.joinCode)),
+                    _buildDivider(),
+                    _buildListTile(Icons.people_alt_outlined, 'Manage Members', onTap: () => _showManageMembersDialog(user.houseId ?? user.id, user.id)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            // --------------------------------------------------
 
             // Settings Group 1: Preferences
             const Text('PREFERENCES', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),

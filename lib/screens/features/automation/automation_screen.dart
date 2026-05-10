@@ -4,143 +4,157 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/automation_rule.dart';
 import '../../../providers/automation_provider.dart';
 import '../../../providers/smart_home_provider.dart';
+import '../../../providers/user_provider.dart';
 
 /// The screen where users can view, create, edit, and toggle Smart Home Automation Rules.
-/// Uses a [ConsumerWidget] to listen to `automationProvider` and rebuild automatically.
 class AutomationScreen extends ConsumerWidget {
   const AutomationScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the automation rules array
-    final rules = ref.watch(automationProvider);
-    // Watch the devices array to map device IDs to readable names
+    // --- UPDATED: Naya filter wala provider use kiya ---
+    final rules = ref.watch(visibleAutomationProvider);
+
+    // Yahan saari devices isliye rakhi hain taake list mein naam sahi se show ho
     final devices = ref.watch(devicesProvider);
+    final currentUser = ref.watch(userProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
-        title: const Text('Automation Rules'),
+        title: const Text('Automation Rules', style: TextStyle(color: Color(0xFF2D3436), fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF2D3436)),
       ),
-      body:
-          rules.isEmpty
-              ? const Center(child: Text('No automation rules set yet.'))
-              : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: rules.length,
-                itemBuilder: (context, index) {
-                  final rule = rules[index];
-                  final deviceName =
-                      devices
-                          .firstWhere(
-                            (d) => d.id == rule.targetDeviceId,
-                            orElse: () => devices.first,
-                          )
-                          .name;
+      body: rules.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text('No automation rules set yet.', style: TextStyle(color: Colors.grey.shade500)),
+          ],
+        ),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: rules.length,
+        itemBuilder: (context, index) {
+          final rule = rules[index];
+          final deviceName = devices.firstWhere(
+                (d) => d.id == rule.targetDeviceId,
+            orElse: () => devices.first,
+          ).name;
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                rule.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'If: $deviceName ${rule.property} ${rule.operator} ${rule.value}',
-                              ),
-                              Text(
-                                'Then: ${rule.action.replaceAll('_', ' ').toUpperCase()}',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+          final canEdit = (currentUser?.role.name == 'owner' || currentUser?.id == rule.creatorId);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 4))
+                ]
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rule.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('If: $deviceName ${rule.property} ${rule.operator} ${rule.value}', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Then: ${rule.action.replaceAll('_', ' ').toUpperCase()}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
-                        // Actions: Edit, Delete, Switch
-                        Row(
+                      ),
+                      const SizedBox(height: 8),
+                      // --- CREATOR BADGE ---
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.edit,
-                                color: Colors.blue,
-                                size: 20,
-                              ),
-                              onPressed:
-                                  () => _showRuleDialog(
-                                    context,
-                                    ref,
-                                    existingRule: rule,
-                                  ),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              onPressed:
-                                  () => ref
-                                      .read(automationProvider.notifier)
-                                      .removeRule(rule.id),
-                            ),
-                            Switch(
-                              value: rule.isActive,
-                              onChanged:
-                                  (val) => ref
-                                      .read(automationProvider.notifier)
-                                      .toggleRule(rule.id),
+                            Icon(Icons.person, size: 12, color: Colors.blue.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              'By: ${rule.creatorName}',
+                              style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Actions: Edit, Delete, Switch
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (canEdit) ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                        onPressed: () => _showRuleDialog(context, ref, existingRule: rule),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        onPressed: () => ref.read(automationProvider.notifier).removeRule(rule.id), // Action hamesha base provider par hogi
+                      ),
+                    ],
+                    Switch(
+                      value: rule.isActive,
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      onChanged: (val) {
+                        if(canEdit) ref.read(automationProvider.notifier).toggleRule(rule.id);
+                      },
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showRuleDialog(context, ref),
         icon: const Icon(Icons.add),
         label: const Text('New Rule'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
       ),
     );
   }
 
-  /// Displays a comprehensive dialog for creating or editing an Automation Rule.
-  /// Uses a [StatefulBuilder] to update the dialog's local UI state (dropdowns, chips) instantly.
-  void _showRuleDialog(
-    BuildContext context,
-    WidgetRef ref, {
-    AutomationRule? existingRule,
-  }) {
+  void _showRuleDialog(BuildContext context, WidgetRef ref, {AutomationRule? existingRule}) {
     final isEditing = existingRule != null;
-    final nameController = TextEditingController(
-      text: existingRule?.name ?? '',
-    );
-    final valueController = TextEditingController(
-      text: existingRule?.value.toString() ?? '',
-    );
+    final nameController = TextEditingController(text: existingRule?.name ?? '');
+    final valueController = TextEditingController(text: existingRule?.value.toString() ?? '');
 
-    final devices = ref.read(devicesProvider);
-    final allRooms = ref.read(roomsProvider);
+    // --- UPDATED: Sirf wahi rooms nikalo jo is user ko allowed hain ---
+    final allRooms = ref.read(visibleRoomsProvider);
+    final allowedRoomIds = allRooms.map((r) => r.id).toSet();
+
+    // --- UPDATED: Sirf allowed rooms ki devices show karo ---
+    final allDevices = ref.read(devicesProvider);
+    final devices = allDevices.where((d) => allowedRoomIds.contains(d.roomId)).toList();
+
     final roomIds = devices.map((d) => d.roomId).toSet().toList();
 
     String? selectedRoom;
@@ -189,10 +203,7 @@ class AutomationScreen extends ConsumerWidget {
           final inputDecoration = InputDecoration(
             filled: true,
             fillColor: Colors.grey.shade100,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           );
 
@@ -222,6 +233,7 @@ class AutomationScreen extends ConsumerWidget {
                       hint: const Text('Select a Room (Optional)'),
                       items: roomIds.map((id) {
                         String roomName = 'Unknown Room';
+                        // allRooms already filtered hai upar
                         try { roomName = allRooms.firstWhere((r) => r.id == id).name; } catch (_) {}
                         return DropdownMenuItem(value: id, child: Text(roomName));
                       }).toList(),
@@ -321,6 +333,10 @@ class AutomationScreen extends ConsumerWidget {
               ElevatedButton(
                 onPressed: () {
                   if (selectedDeviceId == null || valueController.text.isEmpty) return;
+
+                  final currentUser = ref.read(userProvider);
+
+                  // Base provider par hi add hoga (notifier ko use karna lazmi hota hai updates k liye)
                   ref.read(automationProvider.notifier).addOrUpdateRule(
                     existingId: isEditing ? existingRule.id : null,
                     name: nameController.text.isNotEmpty ? nameController.text : 'New Rule',
@@ -329,6 +345,8 @@ class AutomationScreen extends ConsumerWidget {
                     operator: selectedOperator,
                     value: double.parse(valueController.text),
                     action: selectedAction,
+                    creatorId: currentUser?.id ?? '',
+                    creatorName: currentUser?.name ?? 'Unknown Member',
                   );
                   Navigator.pop(ctx);
                 },

@@ -1,3 +1,5 @@
+import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -8,19 +10,14 @@ import './automation_provider.dart';
 import './smart_home_provider.dart';
 import 'user_provider.dart';
 
-/// Represents the current authentication and initialization state of the app.
-/// This immutable class holds all the flags needed to determine which screen
-/// to show the user (e.g., login, onboarding, dashboard, or hub connection).
 class AuthState {
-  final bool isAuthenticated; // Is the user successfully logged in?
-  final String? error; // Any authentication errors (e.g., wrong password)
-  final bool isLoading; // True when a network request is happening
-  final bool isInitializing; // True when the app is first starting up
-  final bool
-  hasSeenOnboarding; // True if the user has completed the welcome slider
-  final bool
-  isFirstTime; // True if the user is logging in for the very first time
-  final bool isHubConnected; // True if the mock Raspberry Pi Hub is connected
+  final bool isAuthenticated;
+  final String? error;
+  final bool isLoading;
+  final bool isInitializing;
+  final bool hasSeenOnboarding;
+  final bool isFirstTime;
+  final bool isHubConnected;
 
   const AuthState({
     this.isAuthenticated = false,
@@ -32,8 +29,6 @@ class AuthState {
     this.isHubConnected = false,
   });
 
-  /// Creates a copy of the current state with specific fields updated.
-  /// This is standard practice in immutable state management (like Riverpod).
   AuthState copyWith({
     bool? isAuthenticated,
     String? error,
@@ -42,7 +37,7 @@ class AuthState {
     bool? hasSeenOnboarding,
     bool? isFirstTime,
     bool? isHubConnected,
-    bool clearError = false, // Special flag to wipe out previous errors
+    bool clearError = false,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -56,50 +51,40 @@ class AuthState {
   }
 }
 
-/// The core Authentication Provider that manages login, signup, and Google Auth.
-/// It interacts directly with Firebase Auth and updates the [AuthState].
 class AuthNotifier extends Notifier<AuthState> {
   final LocalStorageService _storage = LocalStorageService();
   final firebase.FirebaseAuth _auth = firebase.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   AuthState build() {
-    // When the app starts, immediately check if the user is already logged in
     Future.microtask(_checkLoginStatus);
     return const AuthState();
   }
 
-  /// Checks local storage and Firebase to restore the user's session silently.
   Future<void> _checkLoginStatus() async {
     try {
-      // Artificial delay to ensure the beautiful Splash Screen animations finish playing
       await Future.delayed(const Duration(seconds: 2));
 
-      // 1. Fetch persistent flags from SharedPreferences
       final hasSeenOnboarding = await _storage.hasSeenOnboarding();
       final isFirstTime = await _storage.isFirstTime();
       final isHubConnected = await _storage.isHubConnected();
 
-      // 2. Check if Firebase remembers a logged-in user
       final firebaseUser = _auth.currentUser;
       final isLogged = firebaseUser != null;
 
       if (isLogged) {
-        // 3. Fetch local user if exists to preserve avatarUrl
-        final cachedUser = await _storage.getUserByEmail(firebaseUser.email ?? '');
-
-        final user = User(
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName ?? 'User',
-          email: firebaseUser.email ?? '',
-          avatarUrl: cachedUser?.avatarUrl, // Preserve local profile pic
-        );
-        // Save to Riverpod's user provider
-        ref.read(userProvider.notifier).setUser(user);
+        final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+        if (doc.exists) {
+          final user = User.fromMap(doc.data()!);
+          ref.read(userProvider.notifier).setUser(user);
+        } else {
+          // Invalid user state
+          await logout();
+        }
       }
 
-      // 4. Update the UI state to stop loading and show the correct screen
       state = state.copyWith(
         isAuthenticated: isLogged,
         isInitializing: false,
@@ -108,139 +93,218 @@ class AuthNotifier extends Notifier<AuthState> {
         isHubConnected: isHubConnected,
       );
     } catch (e) {
-      // If anything fails during startup, stop initializing and show error
       state = state.copyWith(isInitializing: false, error: e.toString());
     }
   }
 
-  /// Handles standard Email & Password login via Firebase
-  Future<bool> login(String email, String password) async {
-    state = state.copyWith(isLoading: true, clearError: true); // Show spinner
-    try {
-      // Attempt Firebase login
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  // ════════════════════════════════════════════════
+  // EMAIL / PASSWORD AUTHENTICATION
+  // ════════════════════════════════════════════════
 
-      // Save onboarding flag so they don't see the welcome screen again
+  Future<bool> login(String email, String password) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password);
       await _storage.setHasSeenOnboarding(true);
 
-      // Create our local User model
-      final user = User(
-        id: userCredential.user!.uid,
-        name: userCredential.user!.displayName ?? 'User',
-        email: userCredential.user!.email!,
-      );
-      ref.read(userProvider.notifier).setUser(user);
+      final doc = await _firestore.collection('users').doc(userCredential.user!.uid).get();
+      if (doc.exists) {
+        final user = User.fromMap(doc.data()!);
+        ref.read(userProvider.notifier).setUser(user);
+      } else {
+        throw "User role data not found in database.";
+      }
 
-      // Success! Update state
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        hasSeenOnboarding: true,
-      );
+      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
       return true;
     } on firebase.FirebaseAuthException catch (e) {
-      // Firebase throws specific errors (e.g., wrong password, user not found)
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Login failed',
-      );
+      state = state.copyWith(isLoading: false, error: e.message ?? 'Login failed');
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
   }
 
-  /// Handles creating a new account via Firebase Email & Password
-  Future<bool> signup(String name, String email, String password) async {
+  Future<bool> signup(String name, String email, String password, UserRole role, {String? joinCode, String? houseName}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      // Create user in Firebase Auth
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      String? targetHouseId;
+      String? targetHouseName;
 
-      // Firebase Auth doesn't take a 'name' on creation, so we must update it immediately after
+      // 1. Validation Logic Based on Role
+      if (role == UserRole.member) {
+        if (joinCode == null || joinCode.trim().isEmpty) throw "Please enter a Join Code provided by the House Owner.";
+
+        final houseQuery = await _firestore.collection('users').where('role', isEqualTo: 'owner').where('joinCode', isEqualTo: joinCode).limit(1).get();
+        if (houseQuery.docs.isEmpty) throw "Invalid Join Code. Please check with your House Owner.";
+
+        targetHouseId = houseQuery.docs.first.id;
+        targetHouseName = houseQuery.docs.first.data()['houseName'];
+      } else {
+        if (houseName == null || houseName.trim().isEmpty) throw "Please provide a House Name or Number.";
+        targetHouseName = houseName.trim();
+
+        final existingHouseQuery = await _firestore.collection('users').where('role', isEqualTo: 'owner').where('houseName', isEqualTo: targetHouseName).limit(1).get();
+        if (existingHouseQuery.docs.isNotEmpty) throw "Sirf ik hi Owner registered ho skta hai. House '$targetHouseName' is already registered.";
+      }
+
+      // 2. Auth & Create User
+      final userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final uid = userCredential.user!.uid;
       await userCredential.user!.updateDisplayName(name);
-
       await _storage.setHasSeenOnboarding(true);
 
       final newUser = User(
-        id: userCredential.user!.uid,
+        id: uid,
         name: name,
         email: email,
+        role: role,
+        houseId: role == UserRole.owner ? uid : targetHouseId,
+        houseName: targetHouseName,
+        isApproved: role == UserRole.owner,
+        joinCode: role == UserRole.owner ? _generateJoinCode() : null,
       );
+
+      await _firestore.collection('users').doc(uid).set(newUser.toMap());
       ref.read(userProvider.notifier).setUser(newUser);
 
-      // Success!
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        hasSeenOnboarding: true,
-      );
+      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
       return true;
-    } on firebase.FirebaseAuthException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Signup failed',
-      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
   }
 
-  /// Handles Google Sign-In (OAuth 2.0 flow)
-  Future<void> signInWithGoogle() async {
+  // ════════════════════════════════════════════════
+  // GOOGLE AUTHENTICATION
+  // ════════════════════════════════════════════════
+
+  /// [LOGIN ONLY] Ye method sirf Login Screen se call hoga.
+  /// Agar user registered nahi hai, toh ye reject kar dega.
+  Future<bool> signInWithGoogle() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      // 1. Initialize the Google Sign In SDK
       await _googleSignIn.initialize();
-
-      // 2. Trigger the Google Account picker UI
       final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
-      // 3. Get the raw authentication tokens
       final googleAuth = googleUser.authentication;
+      final authorizedUser = await googleUser.authorizationClient.authorizeScopes(['email', 'profile']);
 
-      // 4. Request authorization for Email and Profile scopes to get the Access Token
-      final authorizedUser = await googleUser.authorizationClient
-          .authorizeScopes(['email', 'profile']);
-
-      // 5. Combine tokens into a Firebase Credential
       final credential = firebase.GoogleAuthProvider.credential(
         accessToken: authorizedUser.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 6. Sign in to Firebase using this Google Credential
       final userCredential = await _auth.signInWithCredential(credential);
+      final uid = userCredential.user!.uid;
+
+      // LOGIN CHECK: Pura user data fetch karo
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) {
+        // User NOT Registered
+        await _auth.signOut();
+        await _googleSignIn.signOut();
+        throw "User not Registered. Please sign up to register your House or Join Code first.";
+      }
 
       await _storage.setHasSeenOnboarding(true);
-
-      // 7. Sync the new Google User into our local state
-      final user = User(
-        id: userCredential.user!.uid,
-        name:
-            userCredential.user!.displayName ??
-            googleUser.displayName ??
-            'User',
-        email: userCredential.user!.email ?? googleUser.email,
-      );
+      final user = User.fromMap(doc.data()!);
       ref.read(userProvider.notifier).setUser(user);
 
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        hasSeenOnboarding: true,
-      );
-    } on firebase.FirebaseAuthException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Google sign-in failed');
+      // Remove generic Firebase strings for a cleaner UI error
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(isLoading: false, error: errorMsg);
+      return false;
     }
   }
 
-  /// Sends a password reset email via Firebase
+  /// [SIGNUP ONLY] Ye method sirf Signup Screen se call hoga.
+  /// UI mein user pehle House Name ya Join code likhega, phir Google button press karega.
+  Future<bool> signUpWithGoogle(UserRole role, {String? houseName, String? joinCode}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      String? targetHouseId;
+      String? targetHouseName;
+
+      // 1. Validation (Google popup open hone se pehle House Name / Join code check hoga)
+      if (role == UserRole.member) {
+        if (joinCode == null || joinCode.trim().isEmpty) throw "Please enter a Join Code provided by the House Owner.";
+
+        final houseQuery = await _firestore.collection('users').where('role', isEqualTo: 'owner').where('joinCode', isEqualTo: joinCode).limit(1).get();
+        if (houseQuery.docs.isEmpty) throw "Invalid Join Code. Please check with your House Owner.";
+
+        targetHouseId = houseQuery.docs.first.id;
+        targetHouseName = houseQuery.docs.first.data()['houseName'];
+      } else {
+        if (houseName == null || houseName.trim().isEmpty) throw "Please provide a House Name or Number.";
+        targetHouseName = houseName.trim();
+
+        final existingHouseQuery = await _firestore.collection('users').where('role', isEqualTo: 'owner').where('houseName', isEqualTo: targetHouseName).limit(1).get();
+        if (existingHouseQuery.docs.isNotEmpty) throw "Sirf ik hi Owner registered ho skta hai. House '$targetHouseName' is already registered.";
+      }
+
+      // 2. Google Authentication Step
+      await _googleSignIn.initialize();
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+      final googleAuth = googleUser.authentication;
+      final authorizedUser = await googleUser.authorizationClient.authorizeScopes(['email', 'profile']);
+
+      final credential = firebase.GoogleAuthProvider.credential(
+        accessToken: authorizedUser.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final uid = userCredential.user!.uid;
+
+      // 4. Check if already completely registered
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        throw "This Google account is already registered. Please login instead.";
+      }
+
+      // 5. Create new User Profile in Database
+      final newUser = User(
+        id: uid,
+        name: userCredential.user!.displayName ?? 'Google User',
+        email: userCredential.user!.email ?? '',
+        role: role,
+        houseId: role == UserRole.owner ? uid : targetHouseId,
+        houseName: targetHouseName,
+        isApproved: role == UserRole.owner,
+        joinCode: role == UserRole.owner ? _generateJoinCode() : null,
+      );
+
+      await _firestore.collection('users').doc(uid).set(newUser.toMap());
+      ref.read(userProvider.notifier).setUser(newUser);
+      await _storage.setHasSeenOnboarding(true);
+
+      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      return true;
+
+    } catch (e) {
+      // Agar error ata hai toh Google auth ko wapis logout kardo
+      await _auth.signOut();
+      await _googleSignIn.signOut();
+
+      final errorMsg = e.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(isLoading: false, error: errorMsg);
+      return false;
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════
+
+  String _generateJoinCode() {
+    return (Random().nextInt(900000) + 100000).toString();
+  }
+
   Future<bool> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -251,68 +315,42 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Logs the user out and clears ALL cached data from RAM memory
   Future<void> logout() async {
-    // 1. Sign out from remote services
     await _auth.signOut();
     await _googleSignIn.signOut();
-
-    // 2. Clear local user profile
     ref.read(userProvider.notifier).clearUser();
-
-    // 3. CRITICAL: Invalidate (reset) all Riverpod providers!
-    // If we don't do this, the next user who logs in will see the previous user's devices/rooms.
     ref.invalidate(roomsProvider);
     ref.invalidate(devicesProvider);
     ref.invalidate(activityLogProvider);
     ref.invalidate(automationProvider);
-
-    // 4. Update UI to push back to login screen
     state = state.copyWith(isAuthenticated: false);
   }
 
-  /// Simulates connecting the physical Smart Home Hub (Raspberry Pi/ESP32)
   Future<void> simulateHubConnection({
     bool screenReader = false,
     bool voiceFeedback = false,
     bool visualAlerts = false,
   }) async {
     state = state.copyWith(isLoading: true);
-
-    // Fake network delay for realism
     await Future.delayed(const Duration(seconds: 2));
 
-    // Generate a fake Hub ID
-    final randomPart = DateTime.now().millisecondsSinceEpoch
-        .toString()
-        .substring(8);
+    final randomPart = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
     final hubId = "RPI_$randomPart";
 
-    // Save settings locally
     await _storage.setHubId(hubId);
     await _storage.setHubConnected(true);
-    await _storage.saveAccessibilitySettings(
-      screenReader: screenReader,
-      voiceFeedback: voiceFeedback,
-      visualAlerts: visualAlerts,
-    );
+    await _storage.saveAccessibilitySettings(screenReader: screenReader, voiceFeedback: voiceFeedback, visualAlerts: visualAlerts);
     await _storage.setFirstTime(false);
 
-    state = state.copyWith(
-      isLoading: false,
-      isHubConnected: true,
-      isFirstTime: false,
-    );
+    state = state.copyWith(isLoading: false, isHubConnected: true, isFirstTime: false);
   }
 
-  /// Marks the visual onboarding slider as completed
   Future<void> completeOnboarding() async {
     await _storage.setHasSeenOnboarding(true);
     state = state.copyWith(hasSeenOnboarding: true);
   }
 }
 
-/// Global provider to access AuthNotifier from anywhere in the app
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(
   AuthNotifier.new,
 );

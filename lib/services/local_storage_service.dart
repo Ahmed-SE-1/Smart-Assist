@@ -23,7 +23,9 @@ class LocalStorageService {
   /// Also updates a mock local "Database" of all users who have ever logged in.
   Future<void> saveUser(User user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, user.toJson());
+
+    // UPDATED: Use toMap() and json.encode() instead of toJson()
+    await prefs.setString(_userKey, json.encode(user.toMap()));
 
     final usersDb = await getUsersDb();
     usersDb[user.email] = user.toMap();
@@ -62,7 +64,8 @@ class LocalStorageService {
     final prefs = await SharedPreferences.getInstance();
     final userStr = prefs.getString(_userKey);
     if (userStr != null) {
-      return User.fromJson(userStr);
+      // UPDATED: Use json.decode() and fromMap() instead of fromJson()
+      return User.fromMap(json.decode(userStr));
     }
     return null;
   }

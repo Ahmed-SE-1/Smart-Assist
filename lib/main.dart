@@ -7,6 +7,8 @@ import 'core/theme.dart';
 import 'firebase_options.dart';
 import 'providers/theme_provider.dart';
 
+
+
 /// The main entry point for the SmartAssist application.
 void main() async {
   // Ensures that the Flutter engine is properly initialized before running async code

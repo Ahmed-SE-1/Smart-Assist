@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../models/device.dart';
+import '../../models/user.dart';
+import '../../models/device.dart'; // Future use ke liye rakh sakte hain
 import '../../providers/smart_home_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/auth_provider.dart';
 
 /// The primary Home screen of the application.
-/// Displays user statistics, saved rooms, and quick access feature controls.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
-  /// Maps a room type string (saved in DB) to a visual Material Icon.
   IconData _roomIcon(String iconAsset) {
     switch (iconAsset) {
       case 'living_room': return Icons.chair_outlined;
@@ -25,8 +25,6 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
-  /// Determines how to render the user's avatar.
-  /// Handles fallback network images, real web URLs, and local file paths.
   ImageProvider _getAvatarImage(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return const NetworkImage('https://i.pravatar.cc/150?img=11');
@@ -37,8 +35,6 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
-  /// Returns a unique vibrant color gradient based on the room's index in the list.
-  /// Gives the horizontal room list a modern, colorful look.
   List<Color> _roomGradient(int index) {
     const gradients = [
       [Color(0xFF6C5CE7), Color(0xFF8E84F3)],
@@ -52,17 +48,19 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Watch Riverpod providers so the Dashboard rebuilds instantly if data changes.
     final user = ref.watch(userProvider);
-    final rooms = ref.watch(roomsProvider);
-    final devices = ref.watch(devicesProvider);
-    
-    // 2. Computed statistics for the top cards
+
+    if (user != null && !user.isApproved) {
+      return _buildWaitingScreen(context, ref);
+    }
+
+    // --- UPDATED: Naya filter wala provider use kiya (Access Control) ---
+    final rooms = ref.watch(visibleRoomsProvider);
+
+    // Yahan se unused devicesProvider remove kar diya hai
+
     final activeCount = ref.watch(activeDeviceCountProvider);
     final temperature = ref.watch(temperatureProvider);
-
-    // Get quick-control devices (first 4 non-sensor devices)
-    final quickDevices = devices.where((d) => d.type != DeviceType.sensor).take(4).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
@@ -84,12 +82,35 @@ class DashboardScreen extends ConsumerWidget {
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${user?.name ?? "User"} 👋',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2D3436),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '${user?.name ?? "User"} 👋',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF2D3436),
+                            ),
+                          ),
+                          if (user?.role == UserRole.owner) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                              ),
+                              child: Text(
+                                'Owner',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -172,6 +193,8 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 16),
+
+              // --- UPDATED: Passing creatorName to the Card ---
               SizedBox(
                 height: 140,
                 child: ListView.separated(
@@ -185,6 +208,7 @@ class DashboardScreen extends ConsumerWidget {
                       context,
                       title: room.name,
                       devices: '${roomDevices.length} Devices',
+                      creatorName: room.creatorName, // <-- NAYA: Pass Creator Name
                       icon: _roomIcon(room.iconAsset),
                       gradient: _roomGradient(index),
                       onTap: () => context.push('/room/${room.name}'),
@@ -239,7 +263,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Displays a modal popup to let the user create a new Room.
   void _showAddRoomDialog(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
     String selectedIcon = 'living_room';
@@ -328,7 +351,20 @@ class DashboardScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 if (controller.text.trim().isEmpty) return;
-                final error = ref.read(roomsProvider.notifier).addRoom(controller.text, selectedIcon);
+
+                // --- NAYA: Fetching current user details for Creator Info ---
+                final currentUser = ref.read(userProvider);
+                final creatorId = currentUser?.id ?? '';
+                final creatorName = currentUser?.name ?? 'Unknown';
+
+                // --- NAYA: Passing creator details to Notifier (addRoom base provider mein hi hota hai) ---
+                final error = ref.read(roomsProvider.notifier).addRoom(
+                  controller.text,
+                  selectedIcon,
+                  creatorId,
+                  creatorName,
+                );
+
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
                 } else {
@@ -350,33 +386,56 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// A generic builder for the colorful Room Cards seen in the horizontal list.
-  Widget _buildRoomCard(BuildContext context, {required String title, required String devices, required IconData icon, required List<Color> gradient, required VoidCallback onTap}) {
+  /// --- UPDATED: Added `creatorName` parameter and Badge UI ---
+  Widget _buildRoomCard(BuildContext context, {
+    required String title,
+    required String devices,
+    required String creatorName,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 120,
-        padding: const EdgeInsets.all(16),
+        width: 130, // Thora width barhaya hai badge fit karne ke liye
+        padding: const EdgeInsets.all(12), // Padding thori adjust ki
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: gradient[0].withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
+            BoxShadow(color: gradient[0].withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: Colors.white, size: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: Colors.white, size: 32),
+                // --- NAYA: CREATOR BADGE ---
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2), // Transparent black
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'By: $creatorName',
+                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
                 Text(devices, style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
@@ -386,25 +445,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  IconData _deviceIcon(DeviceType type) {
-    switch (type) {
-      case DeviceType.light: return Icons.lightbulb_outline;
-      case DeviceType.fan: return Icons.air;
-      case DeviceType.ac: return Icons.ac_unit;
-      case DeviceType.sensor: return Icons.sensors;
-    }
-  }
-
-  Color _deviceColor(DeviceType type) {
-    switch (type) {
-      case DeviceType.light: return Colors.orange;
-      case DeviceType.fan: return Colors.blue;
-      case DeviceType.ac: return Colors.cyan;
-      case DeviceType.sensor: return Colors.green;
-    }
-  }
-
-  /// Builds the white rounded square cards used for Quick Controls (e.g. Voice Assistant).
   Widget _buildControlFeatureCard(BuildContext context, {required String title, required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -414,11 +454,7 @@ class DashboardScreen extends ConsumerWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
+            BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
           ],
         ),
         child: Column(
@@ -426,19 +462,52 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 32),
             ),
             const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3436)),
-              textAlign: TextAlign.center,
-            ),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3436)), textAlign: TextAlign.center),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaitingScreen(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.hourglass_top_rounded, size: 80, color: Colors.blue),
+              ),
+              const SizedBox(height: 32),
+              Text('Approval Pending', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF2D3436)), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              Text('Your account has been created successfully. Please wait for the House Owner to approve your join request to access the home controls.', style: TextStyle(fontSize: 16, color: Colors.grey.shade600, height: 1.5), textAlign: TextAlign.center),
+              const SizedBox(height: 40),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(authProvider.notifier).logout();
+                  context.go('/login');
+                },
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  side: BorderSide(color: Colors.redAccent.shade100),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
