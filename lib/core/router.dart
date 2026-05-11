@@ -6,8 +6,6 @@ import '../providers/auth_provider.dart';
 import '../models/user.dart'; // IMPORTANT: UserRole enum ke liye add kiya gaya
 
 import '../screens/splash_screen.dart';
-import '../screens/onboarding/onboarding_screen.dart';
-import '../screens/onboarding/hub_connection_screen.dart';
 import '../screens/rooms/room_detail_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -43,34 +41,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authState.isInitializing) return '/';
 
       final isAuth = authState.isAuthenticated;
-      final hasSeenOnboarding = authState.hasSeenOnboarding;
-      final isFirstTime = authState.isFirstTime;
-      final isHubConnected = authState.isHubConnected;
 
       // UPDATED: Added /role-selection to auth routes
       final isGoingToAuth = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/role-selection';
 
-      final isGoingToOnboarding = state.matchedLocation == '/onboarding';
-      final isGoingToHub = state.matchedLocation == '/hub_connection';
       final isSplash = state.matchedLocation == '/';
 
       // LOGIC FOR UNAUTHENTICATED USERS:
       if (!isAuth) {
-        if (!hasSeenOnboarding && !isGoingToOnboarding) return '/onboarding';
-        if (hasSeenOnboarding && !isGoingToAuth) return '/login';
+        if (!isGoingToAuth) return '/login';
       }
       // LOGIC FOR AUTHENTICATED USERS:
       else {
-        if (isFirstTime && !isGoingToHub) {
-          return '/hub_connection';
-        }
-        if (!isHubConnected && !isGoingToHub) {
-          return '/hub_connection';
-        }
-
-        if ((isGoingToAuth || isSplash || isGoingToOnboarding || isGoingToHub) && !isFirstTime && isHubConnected) {
+        if (isGoingToAuth || isSplash) {
           return '/home';
         }
       }
@@ -80,16 +65,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       // --- UNPROTECTED / SETUP ROUTES ---
       GoRoute(
-        path: '/hub_connection',
-        builder: (context, state) => const HubConnectionScreen(),
-      ),
-      GoRoute(
         path: '/',
         builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -113,7 +90,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // --- PROTECTED ROUTES (Require Login & Hub Connection) ---
+      // --- PROTECTED ROUTES (Require Login) ---
       ShellRoute(
         builder: (context, state, child) => MainLayout(child: child),
         routes: [

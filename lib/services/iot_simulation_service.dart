@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 /// Simulates the full physical IoT architecture.

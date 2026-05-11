@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/user.dart';
-import '../../models/device.dart'; // Future use ke liye rakh sakte hain
 import '../../providers/smart_home_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -74,53 +73,56 @@ class DashboardScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hello,',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            '${user?.name ?? "User"} 👋',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF2D3436),
-                            ),
-                          ),
-                          if (user?.role == UserRole.owner) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
-                              ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hello,',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Flexible(
                               child: Text(
-                                'Owner',
-                                style: TextStyle(
-                                  fontSize: 12,
+                                '${user?.name ?? "User"} 👋',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: const Color(0xFF2D3436),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (user?.role == UserRole.owner) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                                ),
+                                child: Text(
+                                  'Owner',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundImage: _getAvatarImage(user?.avatarUrl),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundImage: _getAvatarImage(user?.avatarUrl),
                   ),
                 ],
               ),
@@ -415,19 +417,22 @@ class DashboardScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: Colors.white, size: 32),
-                // --- NAYA: CREATOR BADGE ---
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2), // Transparent black
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'By: $creatorName',
-                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                Icon(icon, color: Colors.white, size: 28),
+                const SizedBox(width: 4),
+                // --- CREATOR BADGE (constrained to prevent overflow) ---
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'By: $creatorName',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ],
@@ -435,8 +440,8 @@ class DashboardScreen extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(devices, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(devices, style: const TextStyle(color: Colors.white70, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ],

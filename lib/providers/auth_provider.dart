@@ -15,18 +15,12 @@ class AuthState {
   final String? error;
   final bool isLoading;
   final bool isInitializing;
-  final bool hasSeenOnboarding;
-  final bool isFirstTime;
-  final bool isHubConnected;
 
   const AuthState({
     this.isAuthenticated = false,
     this.error,
     this.isLoading = false,
     this.isInitializing = true,
-    this.hasSeenOnboarding = false,
-    this.isFirstTime = true,
-    this.isHubConnected = false,
   });
 
   AuthState copyWith({
@@ -34,9 +28,6 @@ class AuthState {
     String? error,
     bool? isLoading,
     bool? isInitializing,
-    bool? hasSeenOnboarding,
-    bool? isFirstTime,
-    bool? isHubConnected,
     bool clearError = false,
   }) {
     return AuthState(
@@ -44,9 +35,6 @@ class AuthState {
       error: clearError ? null : (error ?? this.error),
       isLoading: isLoading ?? this.isLoading,
       isInitializing: isInitializing ?? this.isInitializing,
-      hasSeenOnboarding: hasSeenOnboarding ?? this.hasSeenOnboarding,
-      isFirstTime: isFirstTime ?? this.isFirstTime,
-      isHubConnected: isHubConnected ?? this.isHubConnected,
     );
   }
 }
@@ -67,10 +55,6 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       await Future.delayed(const Duration(seconds: 2));
 
-      final hasSeenOnboarding = await _storage.hasSeenOnboarding();
-      final isFirstTime = await _storage.isFirstTime();
-      final isHubConnected = await _storage.isHubConnected();
-
       final firebaseUser = _auth.currentUser;
       final isLogged = firebaseUser != null;
 
@@ -88,9 +72,6 @@ class AuthNotifier extends Notifier<AuthState> {
       state = state.copyWith(
         isAuthenticated: isLogged,
         isInitializing: false,
-        hasSeenOnboarding: hasSeenOnboarding,
-        isFirstTime: isFirstTime,
-        isHubConnected: isHubConnected,
       );
     } catch (e) {
       state = state.copyWith(isInitializing: false, error: e.toString());
@@ -105,7 +86,6 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password);
-      await _storage.setHasSeenOnboarding(true);
 
       final doc = await _firestore.collection('users').doc(userCredential.user!.uid).get();
       if (doc.exists) {
@@ -115,7 +95,7 @@ class AuthNotifier extends Notifier<AuthState> {
         throw "User role data not found in database.";
       }
 
-      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      state = state.copyWith(isAuthenticated: true, isLoading: false);
       return true;
     } on firebase.FirebaseAuthException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message ?? 'Login failed');
@@ -153,7 +133,6 @@ class AuthNotifier extends Notifier<AuthState> {
       final userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       final uid = userCredential.user!.uid;
       await userCredential.user!.updateDisplayName(name);
-      await _storage.setHasSeenOnboarding(true);
 
       final newUser = User(
         id: uid,
@@ -169,7 +148,7 @@ class AuthNotifier extends Notifier<AuthState> {
       await _firestore.collection('users').doc(uid).set(newUser.toMap());
       ref.read(userProvider.notifier).setUser(newUser);
 
-      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      state = state.copyWith(isAuthenticated: true, isLoading: false);
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -208,11 +187,10 @@ class AuthNotifier extends Notifier<AuthState> {
         throw "User not Registered. Please sign up to register your House or Join Code first.";
       }
 
-      await _storage.setHasSeenOnboarding(true);
       final user = User.fromMap(doc.data()!);
       ref.read(userProvider.notifier).setUser(user);
 
-      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      state = state.copyWith(isAuthenticated: true, isLoading: false);
       return true;
     } catch (e) {
       // Remove generic Firebase strings for a cleaner UI error
@@ -281,9 +259,8 @@ class AuthNotifier extends Notifier<AuthState> {
 
       await _firestore.collection('users').doc(uid).set(newUser.toMap());
       ref.read(userProvider.notifier).setUser(newUser);
-      await _storage.setHasSeenOnboarding(true);
 
-      state = state.copyWith(isAuthenticated: true, isLoading: false, hasSeenOnboarding: true);
+      state = state.copyWith(isAuthenticated: true, isLoading: false);
       return true;
 
     } catch (e) {
@@ -324,30 +301,6 @@ class AuthNotifier extends Notifier<AuthState> {
     ref.invalidate(activityLogProvider);
     ref.invalidate(automationProvider);
     state = state.copyWith(isAuthenticated: false);
-  }
-
-  Future<void> simulateHubConnection({
-    bool screenReader = false,
-    bool voiceFeedback = false,
-    bool visualAlerts = false,
-  }) async {
-    state = state.copyWith(isLoading: true);
-    await Future.delayed(const Duration(seconds: 2));
-
-    final randomPart = DateTime.now().millisecondsSinceEpoch.toString().substring(8);
-    final hubId = "RPI_$randomPart";
-
-    await _storage.setHubId(hubId);
-    await _storage.setHubConnected(true);
-    await _storage.saveAccessibilitySettings(screenReader: screenReader, voiceFeedback: voiceFeedback, visualAlerts: visualAlerts);
-    await _storage.setFirstTime(false);
-
-    state = state.copyWith(isLoading: false, isHubConnected: true, isFirstTime: false);
-  }
-
-  Future<void> completeOnboarding() async {
-    await _storage.setHasSeenOnboarding(true);
-    state = state.copyWith(hasSeenOnboarding: true);
   }
 }
 
