@@ -113,6 +113,16 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     }
   }
 
+  /// Helper to get the correct icon for a device type.
+  IconData _getIconForType(DeviceType type) {
+    switch (type) {
+      case DeviceType.light: return Icons.lightbulb_outline;
+      case DeviceType.fan: return Icons.air;
+      case DeviceType.ac: return Icons.ac_unit;
+      case DeviceType.sensor: return Icons.sensors;
+    }
+  }
+
   /// Builds a simple ON/OFF switch card for Lights.
   Widget _buildToggleDeviceCard(Device device) {
     return Container(
@@ -389,15 +399,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     final controller = TextEditingController();
     DeviceType selectedType = DeviceType.light;
 
-    IconData _getIconForType(DeviceType type) {
-      switch (type) {
-        case DeviceType.light: return Icons.lightbulb_outline;
-        case DeviceType.fan: return Icons.air;
-        case DeviceType.ac: return Icons.ac_unit;
-        case DeviceType.sensor: return Icons.sensors;
-      }
-    }
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -628,15 +629,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   void _showEditDeviceDialog(Device device) {
     final controller = TextEditingController(text: device.name);
     DeviceType selectedType = device.type;
-
-    IconData _getIconForType(DeviceType type) {
-      switch (type) {
-        case DeviceType.light: return Icons.lightbulb_outline;
-        case DeviceType.fan: return Icons.air;
-        case DeviceType.ac: return Icons.ac_unit;
-        case DeviceType.sensor: return Icons.sensors;
-      }
-    }
 
     showDialog(
       context: context,
