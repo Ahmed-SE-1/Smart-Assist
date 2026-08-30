@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/gesture_control/widgets/control_nav_button.dart';
+
 class MainLayout extends StatelessWidget {
   final Widget child;
 
@@ -8,6 +10,10 @@ class MainLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final selectedIndex = _calculateSelectedIndex(context);
+    final isControlActive = selectedIndex == 2;
+
     return Scaffold(
       body: child,
       bottomNavigationBar: Container(
@@ -15,18 +21,18 @@ class MainLayout extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _calculateSelectedIndex(context),
+          currentIndex: selectedIndex,
           onTap: (idx) => _onItemTapped(idx, context),
           backgroundColor: Colors.white,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: Theme.of(context).colorScheme.primary,
+          selectedItemColor: primaryColor,
           unselectedItemColor: Colors.grey.shade400,
           showSelectedLabels: true,
           showUnselectedLabels: true,
@@ -37,22 +43,8 @@ class MainLayout extends StatelessWidget {
             const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
             const BottomNavigationBarItem(icon: Icon(Icons.grid_view), activeIcon: Icon(Icons.grid_view_rounded), label: 'Rooms'),
             BottomNavigationBarItem(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.mic_none, color: Theme.of(context).colorScheme.primary),
-              ),
-              activeIcon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.mic, color: Colors.white),
-              ),
+              icon: ControlNavButton(isActive: isControlActive, primaryColor: primaryColor),
+              activeIcon: ControlNavButton(isActive: true, primaryColor: primaryColor),
               label: 'Control',
             ),
             const BottomNavigationBarItem(icon: Icon(Icons.notifications_none), activeIcon: Icon(Icons.notifications), label: 'Alerts'),
@@ -82,7 +74,7 @@ class MainLayout extends StatelessWidget {
         context.go('/automation');
         break;
       case 2:
-        context.go('/home/voice');
+        // Tap / long-press handled by [ControlNavButton].
         break;
       case 3:
         context.go('/alerts');
