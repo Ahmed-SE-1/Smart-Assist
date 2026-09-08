@@ -33,6 +33,194 @@ enum RecognizedGesture {
   bool get isActionable =>
       this != RecognizedGesture.unknown &&
       this != RecognizedGesture.none;
+
+  /// Emoji shown in the on-screen gesture guide.
+  String get symbol {
+    switch (this) {
+      case RecognizedGesture.closedFist:
+        return '✊';
+      case RecognizedGesture.openPalm:
+        return '✋';
+      case RecognizedGesture.pointingUp:
+        return '☝️';
+      case RecognizedGesture.thumbDown:
+        return '👎';
+      case RecognizedGesture.thumbUp:
+        return '👍';
+      case RecognizedGesture.victory:
+        return '✌️';
+      case RecognizedGesture.iLoveYou:
+        return '🤟';
+      case RecognizedGesture.unknown:
+      case RecognizedGesture.none:
+        return '❔';
+    }
+  }
+
+  /// Human-readable gesture name (e.g. "Closed Fist").
+  String get displayName {
+    switch (this) {
+      case RecognizedGesture.closedFist:
+        return 'Closed Fist';
+      case RecognizedGesture.openPalm:
+        return 'Open Palm';
+      case RecognizedGesture.pointingUp:
+        return 'Pointing Up';
+      case RecognizedGesture.thumbDown:
+        return 'Thumb Down';
+      case RecognizedGesture.thumbUp:
+        return 'Thumb Up';
+      case RecognizedGesture.victory:
+        return 'Victory';
+      case RecognizedGesture.iLoveYou:
+        return 'I Love You';
+      case RecognizedGesture.unknown:
+        return 'Unknown';
+      case RecognizedGesture.none:
+        return 'No hand';
+    }
+  }
+}
+
+/// One row of the on-screen "which sign does what" guide.
+class GestureActionHint {
+  const GestureActionHint({
+    required this.gesture,
+    required this.action,
+    required this.isAvailable,
+  });
+
+  final RecognizedGesture gesture;
+
+  /// What this sign does in the current navigation state.
+  final String action;
+
+  /// False when the sign is ignored in the current state (shown dimmed).
+  final bool isAvailable;
+
+  String get symbol => gesture.symbol;
+  String get name => gesture.displayName;
+}
+
+/// Gesture → action mapping for [state], mirroring
+/// `GestureNavigationStateMachine.handleGesture`.
+List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
+  switch (state) {
+    case GestureNavState.roomsList:
+      return const [
+        GestureActionHint(
+          gesture: RecognizedGesture.pointingUp,
+          action: 'Next room',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbDown,
+          action: 'Previous room',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.openPalm,
+          action: 'Open selected room',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.closedFist,
+          action: 'Exit gesture mode',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.iLoveYou,
+          action: 'Back to rooms list',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbUp,
+          action: 'Turn ON — pick a device first',
+          isAvailable: false,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.victory,
+          action: 'Turn OFF — pick a device first',
+          isAvailable: false,
+        ),
+      ];
+    case GestureNavState.devicesList:
+      return const [
+        GestureActionHint(
+          gesture: RecognizedGesture.pointingUp,
+          action: 'Next device',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbDown,
+          action: 'Previous device',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.openPalm,
+          action: 'Select this device',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.closedFist,
+          action: 'Back to rooms',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.iLoveYou,
+          action: 'Jump to rooms list',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbUp,
+          action: 'Turn ON — select device first',
+          isAvailable: false,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.victory,
+          action: 'Turn OFF — select device first',
+          isAvailable: false,
+        ),
+      ];
+    case GestureNavState.deviceAction:
+      return const [
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbUp,
+          action: 'Turn device ON',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.victory,
+          action: 'Turn device OFF',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.closedFist,
+          action: 'Back to devices',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.iLoveYou,
+          action: 'Jump to rooms list',
+          isAvailable: true,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.pointingUp,
+          action: 'Next — go back first',
+          isAvailable: false,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.thumbDown,
+          action: 'Previous — go back first',
+          isAvailable: false,
+        ),
+        GestureActionHint(
+          gesture: RecognizedGesture.openPalm,
+          action: 'Select — already selected',
+          isAvailable: false,
+        ),
+      ];
+  }
 }
 
 /// Navigation depth inside Gesture Control mode.

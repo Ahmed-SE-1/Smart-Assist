@@ -42,6 +42,7 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
 
   String _detectedLabel = '';
   double _detectedConfidence = 0;
+  RecognizedGesture _detectedGesture = RecognizedGesture.none;
   bool _inCooldown = false;
   Timer? _cooldownTimer;
   DateTime _lastFrameProcessed = DateTime.fromMillisecondsSinceEpoch(0);
@@ -179,6 +180,7 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
           ? (result.gesture == RecognizedGesture.none ? '' : result.gesture.label)
           : result.rawLabel;
       _detectedConfidence = result.confidence;
+      _detectedGesture = result.gesture;
     });
 
     if (!result.gesture.isActionable || result.confidence < _confidenceThreshold) {
@@ -386,57 +388,98 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
   }
 
   Widget _buildBody() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _headerLabel(),
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth - 40; // horizontal padding
+        final screenHeight = MediaQuery.sizeOf(context).height;
 
-          if (_cameraReady && _cameraController != null)
-            GestureCameraOverlay(
-              cameraPreview: CameraPreview(_cameraController!),
-              detectedLabel: _detectedLabel,
-              confidence: _detectedConfidence,
-              onSwitchCamera: _switchCamera,
-              isFrontCamera:
-                  _cameras.isNotEmpty &&
-                  _cameras[_cameraIndex].lensDirection == CameraLensDirection.front,
-            )
-          else
-            Container(
-              height: 180,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppTheme.cardColorDark,
-                borderRadius: BorderRadius.circular(20),
+        // Portrait 3:4 frame, capped so the guide below stays reachable.
+        final previewHeight = (width * 4 / 3).clamp(240.0, screenHeight * 0.62);
+        final previewAspect = width / previewHeight;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _headerLabel(),
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
-              child: const CircularProgressIndicator(color: AppTheme.primaryColor),
-            ),
+              const SizedBox(height: 12),
 
-          if (_initError != null) ...[
-            const SizedBox(height: 8),
-            Text(_initError!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12)),
-          ],
+              if (_cameraReady && _cameraController != null)
+                GestureCameraOverlay(
+                  cameraPreview: _buildFilledPreview(_cameraController!),
+                  detectedLabel: _detectedLabel,
+                  confidence: _detectedConfidence,
+                  onSwitchCamera: _switchCamera,
+                  aspectRatio: previewAspect,
+                  isFrontCamera:
+                      _cameras.isNotEmpty &&
+                      _cameras[_cameraIndex].lensDirection == CameraLensDirection.front,
+                )
+              else
+                Container(
+                  height: previewHeight,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardColorDark,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const CircularProgressIndicator(color: AppTheme.primaryColor),
+                ),
 
-          const SizedBox(height: 16),
-          GestureHintBar(navState: _snapshot.navState),
-          const SizedBox(height: 16),
+              if (_initError != null) ...[
+                const SizedBox(height: 8),
+                Text(_initError!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+              ],
 
-          GestureNavigationList(
-            navState: _snapshot.navState,
-            itemNames: _currentListItems(),
-            selectedIndex: _currentSelectedIndex(),
-            header: _snapshot.navState == GestureNavState.deviceAction
-                ? 'Selected device — use 👍 ON / ✌ OFF'
-                : null,
+              const SizedBox(height: 16),
+              GestureGuideCard(
+                navState: _snapshot.navState,
+                activeGesture: _detectedConfidence >= _confidenceThreshold
+                    ? _detectedGesture
+                    : null,
+              ),
+              const SizedBox(height: 16),
+
+              GestureNavigationList(
+                navState: _snapshot.navState,
+                itemNames: _currentListItems(),
+                selectedIndex: _currentSelectedIndex(),
+                header: _snapshot.navState == GestureNavState.deviceAction
+                    ? 'Selected device — use 👍 ON / ✌️ OFF'
+                    : null,
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
-          const SizedBox(height: 24),
-        ],
+        );
+      },
+    );
+  }
+
+  /// Scales the camera feed to cover the whole preview frame instead of
+  /// letterboxing inside it.
+  Widget _buildFilledPreview(CameraController controller) {
+    final previewSize = controller.value.previewSize;
+    if (previewSize == null) return CameraPreview(controller);
+
+    return ClipRect(
+      child: OverflowBox(
+        alignment: Alignment.center,
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            // previewSize is reported in sensor orientation (landscape).
+            width: previewSize.height,
+            height: previewSize.width,
+            child: CameraPreview(controller),
+          ),
+        ),
       ),
     );
   }
