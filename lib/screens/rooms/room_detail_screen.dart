@@ -206,9 +206,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   decreasedValue: 'Speed Decreased',
                   child: Slider(
                     value: device.fanSpeed.toDouble(),
-                    min: 0,
-                    max: 5,
-                    divisions: 5,
+                    min: DeviceControlLimits.fanOffSpeed.toDouble(),
+                    max: DeviceControlLimits.maxFanSpeed.toDouble(),
+                    divisions: (DeviceControlLimits.maxFanSpeed -
+                            DeviceControlLimits.fanOffSpeed) ~/
+                        DeviceControlLimits.fanSpeedStep,
                     label: '${device.fanSpeed}',
                     onChanged: (v) => _setFanSpeed(device, v.round()),
                     activeColor: Colors.teal,
@@ -275,9 +277,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     value: '${device.acTemperature} degrees',
                     child: Slider(
                       value: device.acTemperature.toDouble(),
-                      min: 16,
-                      max: 30,
-                      divisions: 14,
+                      min: DeviceControlLimits.minAcTemperature.toDouble(),
+                      max: DeviceControlLimits.maxAcTemperature.toDouble(),
+                      divisions: (DeviceControlLimits.maxAcTemperature -
+                              DeviceControlLimits.minAcTemperature) ~/
+                          DeviceControlLimits.acTemperatureStep,
                       label: '${device.acTemperature}°C',
                       onChanged: (v) => _setACTemperature(device, v.round()),
                       activeColor: Colors.blue,

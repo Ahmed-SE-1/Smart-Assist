@@ -1,5 +1,16 @@
 enum DeviceType { light, fan, ac, sensor }
 
+/// Limits used by the manual device sliders and gesture adjustments.
+abstract final class DeviceControlLimits {
+  static const fanOffSpeed = 0;
+  static const minRunningFanSpeed = 1;
+  static const maxFanSpeed = 5;
+  static const fanSpeedStep = 1;
+  static const minAcTemperature = 16;
+  static const maxAcTemperature = 30;
+  static const acTemperatureStep = 1;
+}
+
 class Device {
   final String id;
   final String name;

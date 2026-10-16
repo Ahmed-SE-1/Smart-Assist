@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,7 @@ import '../../providers/smart_home_provider.dart';
 import 'models/gesture_types.dart';
 import 'services/gesture_recognition_service.dart';
 import 'services/gesture_tts_helper.dart';
+import 'state/gesture_activation_gate.dart';
 import 'state/gesture_navigation_state_machine.dart';
 import 'widgets/gesture_control_widgets.dart';
 
@@ -44,6 +46,13 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
   double _detectedConfidence = 0;
   RecognizedGesture _detectedGesture = RecognizedGesture.none;
   bool _inCooldown = false;
+  final _allOffGate = GestureActivationGate(target: RecognizedGesture.iLoveYou);
+  final _adjustmentGate = GestureActivationGate(
+    target: RecognizedGesture.thumbDown,
+    confirmationFrames: 1,
+  );
+  bool _allOffInProgress = false;
+  bool _frameInFlight = false;
   Timer? _cooldownTimer;
   DateTime _lastFrameProcessed = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _frameInterval = Duration(milliseconds: 120);
@@ -98,6 +107,8 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
               name: d.name,
               roomId: d.roomId,
               isControllable: d.type != DeviceType.sensor,
+              supportsAdjustment:
+                  d.type == DeviceType.fan || d.type == DeviceType.ac,
             ),
           )
           .toList(),
@@ -151,7 +162,7 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
     _cameraController = controller;
     _cameraReady = true;
 
-    await controller.startImageStream(_onCameraFrame);
+    await controller.startImageStream((image) => _onCameraFrame(image, controller));
 
     setState(() {});
   }
@@ -162,14 +173,20 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
     await _startCamera(_cameraIndex);
   }
 
-  void _onCameraFrame(CameraImage image) {
-    if (_inCooldown || !_nativeReady) return;
+  void _onCameraFrame(CameraImage image, CameraController controller) {
+    // Keep observing during cooldown to detect release of a held global sign.
+    if (_frameInFlight || !_nativeReady || controller != _cameraController) return;
 
     final now = DateTime.now();
     if (now.difference(_lastFrameProcessed) < _frameInterval) return;
     _lastFrameProcessed = now;
 
-    _recognitionService.detectFromCameraImage(image).then(_onGestureDetected);
+    _frameInFlight = true;
+    _recognitionService.detectFromCameraImage(
+      image,
+      camera: controller.description,
+      deviceOrientation: controller.value.deviceOrientation,
+    ).then(_onGestureDetected).whenComplete(() => _frameInFlight = false);
   }
 
   Future<void> _onGestureDetected(GestureDetectionResult result) async {
@@ -183,11 +200,40 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
       _detectedGesture = result.gesture;
     });
 
-    if (!result.gesture.isActionable || result.confidence < _confidenceThreshold) {
+    if (kDebugMode && result.rawLabel.isNotEmpty) {
+      debugPrint('Gesture Action: label="${result.rawLabel}" '
+          'confidence=${result.confidence} parsed=${result.gesture.name} '
+          'actionable=${result.gesture.isActionable} '
+          'thresholdPassed=${result.confidence >= _confidenceThreshold} '
+          'cooldown=$_inCooldown state=${_snapshot.navState.name}');
+    }
+
+    final allOffAccepted = _allOffGate.accept(
+      result.gesture,
+      confidence: result.confidence,
+      threshold: _confidenceThreshold,
+      canTrigger: !_inCooldown && !_allOffInProgress,
+    );
+    final adjustmentAccepted = _adjustmentGate.accept(
+      result.gesture,
+      confidence: result.confidence,
+      threshold: _confidenceThreshold,
+      canTrigger: !_inCooldown && !_allOffInProgress,
+    );
+    if (result.gesture == RecognizedGesture.iLoveYou && !allOffAccepted) {
+      return;
+    }
+    if (result.gesture == RecognizedGesture.thumbDown && !adjustmentAccepted) {
       return;
     }
 
-    if (_inCooldown) return;
+    if (!result.gesture.isActionable ||
+        !result.confidence.isFinite ||
+        result.confidence < _confidenceThreshold) {
+      return;
+    }
+
+    if (_inCooldown || _allOffInProgress) return;
 
     // Keep lists fresh in case rooms/devices changed while in gesture mode.
     _syncDataFromProvider();
@@ -197,6 +243,10 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
       confidence: result.confidence,
     );
 
+    if (kDebugMode) {
+      debugPrint('Gesture Navigation: action=${actionResult.action.name} '
+          'hasEffect=${actionResult.hasEffect}');
+    }
     if (!actionResult.hasEffect) return;
 
     _startCooldown();
@@ -232,14 +282,49 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
           await devicesNotifier.turnOff(result.deviceId!, method: 'gesture');
         }
         break;
+      case GestureNavActionType.adjustDevice:
+        if (result.deviceId == null) break;
+        String message;
+        try {
+          message = await devicesNotifier.cycleDeviceAdjustment(
+            result.deviceId!,
+            method: 'gesture',
+          );
+        } catch (_) {
+          message = 'Could not adjust device. Please try again.';
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+        await _tts.speak(message);
+        break;
+      case GestureNavActionType.allDevicesOff:
+        _allOffInProgress = true;
+        try {
+          final outcome = await devicesNotifier.turnOffAll(method: 'gesture');
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(outcome.message)),
+          );
+          await _tts.speak(outcome.message);
+        } catch (_) {
+          if (!mounted) return;
+          const message = 'Could not turn all devices OFF. Please try again.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(message)),
+          );
+          await _tts.speak(message);
+        } finally {
+          _allOffInProgress = false;
+        }
+        break;
       case GestureNavActionType.exitMode:
         if (mounted) _exitGestureMode();
         break;
       case GestureNavActionType.moveNext:
-      case GestureNavActionType.movePrevious:
       case GestureNavActionType.confirmSelection:
       case GestureNavActionType.goBack:
-      case GestureNavActionType.jumpToRooms:
       case GestureNavActionType.none:
         break;
     }
@@ -438,6 +523,8 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
               const SizedBox(height: 16),
               GestureGuideCard(
                 navState: _snapshot.navState,
+                supportsAdjustment:
+                    _stateMachine.selectedDeviceSupportsAdjustment,
                 activeGesture: _detectedConfidence >= _confidenceThreshold
                     ? _detectedGesture
                     : null,
@@ -449,7 +536,7 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
                 itemNames: _currentListItems(),
                 selectedIndex: _currentSelectedIndex(),
                 header: _snapshot.navState == GestureNavState.deviceAction
-                    ? 'Selected device — use 👍 ON / ✌️ OFF'
+                    ? _selectedDeviceHeader()
                     : null,
               ),
               const SizedBox(height: 24),
@@ -458,6 +545,24 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
         );
       },
     );
+  }
+
+  String _selectedDeviceHeader() {
+    final id = _snapshot.selectedDeviceId;
+    final device = id == null
+        ? null
+        : ref.read(devicesProvider.notifier).getById(id);
+    const powerHint = 'Selected device — use 👍 ON / ✌️ OFF';
+    if (device == null) return powerHint;
+    switch (device.type) {
+      case DeviceType.fan:
+        return '$powerHint\nSpeed ${device.fanSpeed} — Thumb Down to cycle speed';
+      case DeviceType.ac:
+        return '$powerHint\n${device.acTemperature}°C — Thumb Down to cycle temperature (ON only)';
+      case DeviceType.light:
+      case DeviceType.sensor:
+        return powerHint;
+    }
   }
 
   /// Scales the camera feed to cover the whole preview frame instead of

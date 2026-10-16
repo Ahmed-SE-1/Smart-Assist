@@ -1,5 +1,7 @@
 package com.example.smart_home
 
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -31,22 +33,41 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
 
-                        val width = call.argument<Int>("width") ?: 0
-                        val height = call.argument<Int>("height") ?: 0
-                        val bytesPerRow = call.argument<Int>("bytesPerRow") ?: width
-                        @Suppress("UNCHECKED_CAST")
-                        val planesRaw = call.argument<List<ByteArray>>("planes")
+                        // Read untrusted channel values without unchecked generic casts.
+                        val args = call.arguments as? Map<*, *>
+                        val width = args?.get("width") as? Int ?: 0
+                        val height = args?.get("height") as? Int ?: 0
+                        val rotation = args?.get("rotation") as? Int ?: -1
+                        val planesRaw = args?.get("planes") as? List<*>
+                        val planes = planesRaw?.mapNotNull { raw ->
+                            val plane = raw as? Map<*, *> ?: return@mapNotNull null
+                            val bytes = plane["bytes"] as? ByteArray ?: return@mapNotNull null
+                            val rowStride = plane["bytesPerRow"] as? Int ?: return@mapNotNull null
+                            val pixelStride = plane["bytesPerPixel"] as? Int ?: return@mapNotNull null
+                            GestureRecognizerHelper.YuvPlane(bytes, rowStride, pixelStride)
+                        }
+                        val debug = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                        if (debug) {
+                            Log.d("GestureRecognizer", "Received ${width}x$height rotation=$rotation " +
+                                "lens=${args?.get("lensDirection")} sensor=${args?.get("sensorOrientation")}")
+                            planes?.forEachIndexed { index, plane ->
+                                Log.d("GestureRecognizer", "Plane $index rowStride=${plane.rowStride} " +
+                                    "pixelStride=${plane.pixelStride} bytes=${plane.bytes.size}")
+                            }
+                        }
 
-                        if (planesRaw == null || width <= 0 || height <= 0) {
+                        if (args?.get("format") != "yuv420" || planesRaw?.size != 3 ||
+                            planes == null || !GestureRecognizerHelper.isValidFrame(planes, width, height, rotation)) {
+                            if (debug) Log.d("GestureRecognizer", "Malformed YUV420 frame; fallback None/0.0")
                             result.success(mapOf("gesture" to "None", "confidence" to 0.0))
                             return@setMethodCallHandler
                         }
 
                         val detection = helper.detectFromYuv420(
-                            planesRaw,
+                            planes,
                             width,
                             height,
-                            bytesPerRow,
+                            rotation,
                         )
                         result.success(detection)
                     }

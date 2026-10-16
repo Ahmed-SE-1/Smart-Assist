@@ -15,6 +15,7 @@ class GestureDeviceItem {
     required this.name,
     required this.roomId,
     required this.isControllable,
+    this.supportsAdjustment = false,
   });
 
   final String id;
@@ -23,6 +24,7 @@ class GestureDeviceItem {
 
   /// Sensors cannot be toggled ON/OFF via gestures.
   final bool isControllable;
+  final bool supportsAdjustment;
 }
 
 /// Core navigation logic for Gesture Control.
@@ -56,6 +58,9 @@ class GestureNavigationStateMachine {
   int get selectedDeviceIndex => _deviceIndex;
   String? get selectedRoomId => _selectedRoomId;
   String? get selectedDeviceId => _selectedDeviceId;
+  bool get selectedDeviceSupportsAdjustment =>
+      _navState == GestureNavState.deviceAction &&
+      (_findDevice(_selectedDeviceId ?? '')?.supportsAdjustment ?? false);
 
   List<GestureRoomItem> get rooms => _rooms;
 
@@ -102,7 +107,9 @@ class GestureNavigationStateMachine {
     RecognizedGesture gesture, {
     required double confidence,
   }) {
-    if (!gesture.isActionable || confidence < confidenceThreshold) {
+    if (!gesture.isActionable ||
+        !confidence.isFinite ||
+        confidence < confidenceThreshold) {
       return GestureNavActionResult(
         action: GestureNavActionType.none,
         snapshot: snapshot(),
@@ -113,7 +120,7 @@ class GestureNavigationStateMachine {
       case RecognizedGesture.pointingUp:
         return _moveNext();
       case RecognizedGesture.thumbDown:
-        return _movePrevious();
+        return _adjustDevice();
       case RecognizedGesture.openPalm:
         return _confirmSelection();
       case RecognizedGesture.closedFist:
@@ -123,7 +130,10 @@ class GestureNavigationStateMachine {
       case RecognizedGesture.victory:
         return _turnOff();
       case RecognizedGesture.iLoveYou:
-        return _jumpToRooms();
+        return GestureNavActionResult(
+          action: GestureNavActionType.allDevicesOff,
+          snapshot: snapshot(),
+        );
       case RecognizedGesture.unknown:
       case RecognizedGesture.none:
         return GestureNavActionResult(
@@ -157,35 +167,18 @@ class GestureNavigationStateMachine {
           ttsMessage: name,
         );
       case GestureNavState.deviceAction:
-        // Navigation gestures are ignored in device_action — only ON/OFF apply.
+        // Navigation gestures are ignored while controlling a selected device.
         return _noAction();
     }
   }
 
-  GestureNavActionResult _movePrevious() {
-    switch (_navState) {
-      case GestureNavState.roomsList:
-        if (_rooms.isEmpty) return _noAction();
-        _roomIndex = (_roomIndex - 1 + _rooms.length) % _rooms.length;
-        final name = _rooms[_roomIndex].name;
-        return GestureNavActionResult(
-          action: GestureNavActionType.movePrevious,
-          snapshot: snapshot(announcement: name),
-          ttsMessage: name,
-        );
-      case GestureNavState.devicesList:
-        final devices = devicesInSelectedRoom;
-        if (devices.isEmpty) return _noAction();
-        _deviceIndex = (_deviceIndex - 1 + devices.length) % devices.length;
-        final name = devices[_deviceIndex].name;
-        return GestureNavActionResult(
-          action: GestureNavActionType.movePrevious,
-          snapshot: snapshot(announcement: name),
-          ttsMessage: name,
-        );
-      case GestureNavState.deviceAction:
-        return _noAction();
-    }
+  GestureNavActionResult _adjustDevice() {
+    if (!selectedDeviceSupportsAdjustment) return _noAction();
+    return GestureNavActionResult(
+      action: GestureNavActionType.adjustDevice,
+      snapshot: snapshot(),
+      deviceId: _selectedDeviceId,
+    );
   }
 
   GestureNavActionResult _confirmSelection() {
@@ -284,20 +277,6 @@ class GestureNavigationStateMachine {
       snapshot: snapshot(announcement: '$name turned OFF'),
       deviceId: _selectedDeviceId,
       ttsMessage: '$name turned OFF',
-    );
-  }
-
-  GestureNavActionResult _jumpToRooms() {
-    _navState = GestureNavState.roomsList;
-    _selectedRoomId = null;
-    _selectedDeviceId = null;
-    _deviceIndex = 0;
-    _clampIndices();
-    final name = _rooms.isNotEmpty ? _rooms[_roomIndex].name : 'Rooms';
-    return GestureNavActionResult(
-      action: GestureNavActionType.jumpToRooms,
-      snapshot: snapshot(announcement: name),
-      ttsMessage: 'Rooms list. $name',
     );
   }
 

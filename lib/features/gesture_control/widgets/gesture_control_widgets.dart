@@ -224,6 +224,7 @@ class GestureGuideCard extends StatefulWidget {
     required this.navState,
     this.activeGesture,
     this.initiallyExpanded = true,
+    this.supportsAdjustment = false,
   });
 
   final GestureNavState navState;
@@ -232,6 +233,7 @@ class GestureGuideCard extends StatefulWidget {
   final RecognizedGesture? activeGesture;
 
   final bool initiallyExpanded;
+  final bool supportsAdjustment;
 
   @override
   State<GestureGuideCard> createState() => _GestureGuideCardState();
@@ -242,7 +244,10 @@ class _GestureGuideCardState extends State<GestureGuideCard> {
 
   @override
   Widget build(BuildContext context) {
-    final hints = gestureActionHintsFor(widget.navState);
+    final hints = gestureActionHintsFor(
+      widget.navState,
+      supportsAdjustment: widget.supportsAdjustment,
+    );
 
     return Container(
       width: double.infinity,

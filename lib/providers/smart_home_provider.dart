@@ -126,6 +126,34 @@ final visibleRoomsProvider = Provider<List<Room>>((ref) {
 // DEVICE STATE MANAGEMENT
 // ═══════════════════════════════════════════
 
+/// Outcome of the existing sequential, per-device OFF operation.
+class AllDevicesOffResult {
+  const AllDevicesOffResult({
+    required this.controllableCount,
+    required this.alreadyOffCount,
+    required this.turnedOffCount,
+    required this.failedCount,
+  });
+
+  final int controllableCount;
+  final int alreadyOffCount;
+  final int turnedOffCount;
+  final int failedCount;
+
+  String get message {
+    if (controllableCount == 0) return 'No controllable devices found.';
+    if (failedCount > 0) {
+      return '$turnedOffCount devices turned OFF. '
+          '$alreadyOffCount already OFF. '
+          '$failedCount devices could not be turned OFF. Please try again.';
+    }
+    if (alreadyOffCount == controllableCount) {
+      return 'All devices are already OFF.';
+    }
+    return 'All devices have been turned OFF.';
+  }
+}
+
 class DevicesNotifier extends Notifier<List<Device>> {
   Timer? _sensorTimer;
 
@@ -321,6 +349,47 @@ class DevicesNotifier extends Notifier<List<Device>> {
     return result.success;
   }
 
+  /// Cycles the current device value using the same setters as manual controls.
+  Future<String> cycleDeviceAdjustment(
+    String deviceId, {
+    String method = 'app',
+  }) async {
+    // Resolve by ID at execution time so provider/remote updates are respected.
+    final device = getById(deviceId);
+    if (device == null) return 'Selected device is no longer available.';
+
+    switch (device.type) {
+      case DeviceType.fan:
+        final current = device.fanSpeed;
+        final next = current < DeviceControlLimits.minRunningFanSpeed ||
+                current >= DeviceControlLimits.maxFanSpeed
+            ? DeviceControlLimits.minRunningFanSpeed
+            : current + DeviceControlLimits.fanSpeedStep;
+        // The manual fan slider is active while OFF; its setter handles power.
+        final success = await setFanSpeed(device, next, method: method);
+        return success
+            ? '${device.name} speed set to $next.'
+            : 'Could not adjust ${device.name}. Device not responding.';
+      case DeviceType.ac:
+        // The manual temperature slider is available only while the AC is ON.
+        if (!device.isOn) {
+          return 'Turn ${device.name} ON before adjusting temperature.';
+        }
+        final current = device.acTemperature;
+        final next = current < DeviceControlLimits.minAcTemperature ||
+                current >= DeviceControlLimits.maxAcTemperature
+            ? DeviceControlLimits.minAcTemperature
+            : current + DeviceControlLimits.acTemperatureStep;
+        final success = await setACTemperature(device, next, method: method);
+        return success
+            ? '${device.name} temperature set to $next degrees.'
+            : 'Could not adjust ${device.name}. Device not responding.';
+      case DeviceType.light:
+      case DeviceType.sensor:
+        return 'This device does not support adjustment.';
+    }
+  }
+
   Future<bool> turnOn(String deviceId, {String method = 'app'}) async {
     final device = state.firstWhere((d) => d.id == deviceId, orElse: () => throw Exception('Device not found'));
     if (device.isOn) return true;
@@ -333,11 +402,36 @@ class DevicesNotifier extends Notifier<List<Device>> {
     return toggleDevice(device, method: method);
   }
 
-  Future<void> turnOffAll({String method = 'app'}) async {
-    final onDevices = state.where((d) => d.isOn && d.type != DeviceType.sensor).toList();
-    for (final device in onDevices) {
-      await toggleDevice(device, method: method);
+  Future<AllDevicesOffResult> turnOffAll({String method = 'app'}) async {
+    // Use the complete house device list, regardless of room selection.
+    final devices = state.where((d) => d.type != DeviceType.sensor).toList();
+    var alreadyOff = 0;
+    var turnedOff = 0;
+    var failed = 0;
+    for (final device in devices) {
+      if (!device.isOn) {
+        alreadyOff++;
+        continue;
+      }
+      try {
+        // Re-read current state through the same OFF path as other controls.
+        // Keep commands sequential, as in the original implementation.
+        if (await turnOff(device.id, method: method)) {
+          turnedOff++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        // A failed/unavailable device must not prevent the others going OFF.
+        failed++;
+      }
     }
+    return AllDevicesOffResult(
+      controllableCount: devices.length,
+      alreadyOffCount: alreadyOff,
+      turnedOffCount: turnedOff,
+      failedCount: failed,
+    );
   }
 
   List<Device> findByName(String name) {

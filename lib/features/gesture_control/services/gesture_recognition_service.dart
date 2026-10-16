@@ -32,7 +32,9 @@ class GestureDetectionResult {
 class GestureRecognitionService {
   GestureRecognitionService();
 
-  static const _channel = MethodChannel('com.example.smart_home/gesture_recognizer');
+  static const _channel = MethodChannel(
+    'com.example.smart_home/gesture_recognizer',
+  );
 
   bool _initialized = false;
   bool _isProcessing = false;
@@ -53,35 +55,87 @@ class GestureRecognitionService {
   }
 
   /// Sends one camera frame for inference. Returns immediately on unsupported platforms.
-  Future<GestureDetectionResult> detectFromCameraImage(CameraImage image) async {
+  Future<GestureDetectionResult> detectFromCameraImage(
+    CameraImage image, {
+    required CameraDescription camera,
+    required DeviceOrientation deviceOrientation,
+  }) async {
     if (!isSupported || !_initialized || _isProcessing) {
       return GestureDetectionResult.none;
     }
 
     _isProcessing = true;
     try {
+      // CameraX 0.7.2 streams unrotated YUV planes. Its orientation mapping
+      // uses Surface rotation degrees: portraitUp=0, landscapeLeft=90,
+      // portraitDown=180, landscapeRight=270. Match CameraX's clockwise
+      // relative image rotation (front adds target rotation, back subtracts).
+      final deviceRotation = switch (deviceOrientation) {
+        DeviceOrientation.portraitUp => 0,
+        DeviceOrientation.landscapeLeft => 90,
+        DeviceOrientation.portraitDown => 180,
+        DeviceOrientation.landscapeRight => 270,
+      };
+      final rotation =
+          (camera.sensorOrientation +
+              (camera.lensDirection == CameraLensDirection.front
+                  ? deviceRotation
+                  : -deviceRotation) +
+              360) %
+          360;
       final planes = image.planes
-          .map((plane) => plane.bytes)
+          .map(
+            (plane) => <String, Object?>{
+              'bytes': plane.bytes,
+              'bytesPerRow': plane.bytesPerRow,
+              'bytesPerPixel': plane.bytesPerPixel,
+            },
+          )
           .toList(growable: false);
 
-      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'detect',
-        {
-          'width': image.width,
-          'height': image.height,
-          'format': image.format.group.name,
-          'planes': planes,
-          'bytesPerRow': image.planes.first.bytesPerRow,
-        },
-      );
+      if (kDebugMode) {
+        debugPrint(
+          'Gesture Camera: width=${image.width} height=${image.height} '
+          'format=${image.format.group.name} lens=${camera.lensDirection.name} '
+          'sensorOrientation=${camera.sensorOrientation} '
+          'deviceOrientation=${deviceOrientation.name} rotation=$rotation',
+        );
+        for (var i = 0; i < image.planes.length; i++) {
+          final plane = image.planes[i];
+          debugPrint(
+            'Gesture Plane $i: bytes=${plane.bytes.length} '
+            'bytesPerRow=${plane.bytesPerRow} bytesPerPixel=${plane.bytesPerPixel}',
+          );
+        }
+      }
+
+      final result = await _channel
+          .invokeMethod<Map<dynamic, dynamic>>('detect', {
+            'width': image.width,
+            'height': image.height,
+            'format': image.format.group.name,
+            'planes': planes,
+            'sensorOrientation': camera.sensorOrientation,
+            'lensDirection': camera.lensDirection.name,
+            'deviceOrientation': deviceOrientation.name,
+            'deviceRotation': deviceRotation,
+            'rotation': rotation,
+          });
 
       if (result == null) return GestureDetectionResult.none;
 
       final label = result['gesture'] as String? ?? '';
       final confidence = (result['confidence'] as num?)?.toDouble() ?? 0.0;
+      final gesture = RecognizedGesture.fromLabel(label);
+      if (kDebugMode) {
+        debugPrint(
+          'Gesture Native: label="$label" confidence=$confidence '
+          'parsed=${gesture.name} actionable=${gesture.isActionable}',
+        );
+      }
 
       return GestureDetectionResult(
-        gesture: RecognizedGesture.fromLabel(label),
+        gesture: gesture,
         confidence: confidence,
         rawLabel: label,
       );

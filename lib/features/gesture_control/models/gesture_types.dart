@@ -16,16 +16,12 @@ enum RecognizedGesture {
 
   /// Parses a raw label string from MediaPipe (case-insensitive).
   static RecognizedGesture fromLabel(String? raw) {
-    if (raw == null || raw.isEmpty) return RecognizedGesture.none;
-    final normalized = raw.trim();
+    final normalized = raw?.trim().toLowerCase() ?? '';
+    if (normalized.isEmpty) return RecognizedGesture.none;
     for (final gesture in RecognizedGesture.values) {
-      if (gesture == RecognizedGesture.none) continue;
-      if (gesture.label.toLowerCase() == normalized.toLowerCase()) {
+      if (gesture.label.toLowerCase() == normalized) {
         return gesture;
       }
-    }
-    if (normalized.toLowerCase() == 'unknown') {
-      return RecognizedGesture.unknown;
     }
     return RecognizedGesture.unknown;
   }
@@ -104,7 +100,10 @@ class GestureActionHint {
 
 /// Gesture → action mapping for [state], mirroring
 /// `GestureNavigationStateMachine.handleGesture`.
-List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
+List<GestureActionHint> gestureActionHintsFor(
+  GestureNavState state, {
+  bool supportsAdjustment = false,
+}) {
   switch (state) {
     case GestureNavState.roomsList:
       return const [
@@ -115,8 +114,8 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.thumbDown,
-          action: 'Previous room',
-          isAvailable: true,
+          action: 'Adjust fan / AC — select device first',
+          isAvailable: false,
         ),
         GestureActionHint(
           gesture: RecognizedGesture.openPalm,
@@ -130,7 +129,7 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.iLoveYou,
-          action: 'Back to rooms list',
+          action: 'Turn ALL devices OFF',
           isAvailable: true,
         ),
         GestureActionHint(
@@ -153,8 +152,8 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.thumbDown,
-          action: 'Previous device',
-          isAvailable: true,
+          action: 'Adjust fan / AC — select device first',
+          isAvailable: false,
         ),
         GestureActionHint(
           gesture: RecognizedGesture.openPalm,
@@ -168,7 +167,7 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.iLoveYou,
-          action: 'Jump to rooms list',
+          action: 'Turn ALL devices OFF',
           isAvailable: true,
         ),
         GestureActionHint(
@@ -183,7 +182,7 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
       ];
     case GestureNavState.deviceAction:
-      return const [
+      return [
         GestureActionHint(
           gesture: RecognizedGesture.thumbUp,
           action: 'Turn device ON',
@@ -201,7 +200,7 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.iLoveYou,
-          action: 'Jump to rooms list',
+          action: 'Turn ALL devices OFF',
           isAvailable: true,
         ),
         GestureActionHint(
@@ -211,8 +210,10 @@ List<GestureActionHint> gestureActionHintsFor(GestureNavState state) {
         ),
         GestureActionHint(
           gesture: RecognizedGesture.thumbDown,
-          action: 'Previous — go back first',
-          isAvailable: false,
+          action: supportsAdjustment
+              ? 'Cycle fan speed / AC temperature'
+              : 'Adjustment unavailable for this device',
+          isAvailable: supportsAdjustment,
         ),
         GestureActionHint(
           gesture: RecognizedGesture.openPalm,
@@ -238,12 +239,12 @@ enum GestureNavState {
 /// Side-effects produced when the state machine accepts a gesture.
 enum GestureNavActionType {
   moveNext,
-  movePrevious,
+  adjustDevice,
   confirmSelection,
   goBack,
   turnOnDevice,
   turnOffDevice,
-  jumpToRooms,
+  allDevicesOff,
   exitMode,
   none,
 }
