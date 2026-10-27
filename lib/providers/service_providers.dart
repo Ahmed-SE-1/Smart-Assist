@@ -1,11 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/mqtt_config.dart';
 import '../services/auto_detect_speech_service.dart';
 import '../services/mqtt_service.dart';
 import '../services/nlp_api_service.dart';
 
+final mqttConfigProvider = Provider<MqttConfig>((ref) => const MqttConfig());
+
 final mqttServiceProvider = Provider<MqttService>((ref) {
-  final service = MqttService();
-  service.connect();
+  final service = MqttService(config: ref.watch(mqttConfigProvider));
+  // Connection is lazy: publishing awaits it, so startup has no unhandled
+  // connection error when the diagnostic mode is disabled or unconfigured.
   ref.onDispose(() => service.dispose());
   return service;
 });

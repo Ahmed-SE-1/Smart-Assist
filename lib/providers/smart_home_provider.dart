@@ -269,12 +269,45 @@ class DevicesNotifier extends Notifier<List<Device>> {
 
   // --- HARDWARE INTERACTION METHODS --- //
 
+  Future<CommandResult> _command(
+    Device device, {
+    required String action,
+    required String method,
+  }) async {
+    final mqtt = ref.read(mqttServiceProvider);
+    final config = ref.read(mqttConfigProvider);
+    final isMappedPhaseOneDevice = config.enabled &&
+        device.id == config.testAppDeviceId &&
+        device.type == DeviceType.light &&
+        (action == 'ON' || action == 'OFF');
+
+    if (isMappedPhaseOneDevice) {
+      final mappingError = config.mappingError;
+      if (mappingError != null) {
+        return CommandResult(
+          success: false,
+          deviceId: device.id,
+          roomId: device.roomId,
+          action: action,
+          method: method,
+          timestamp: DateTime.now(),
+          message: mappingError,
+        );
+      }
+      return mqtt.publishDeviceCommand(
+        houseId: ref.read(userProvider)?.houseId?.trim() ?? '',
+        mqttDeviceId: config.testMqttDeviceId,
+        channel: config.testChannel,
+        state: action,
+      );
+    }
+    return mqtt.publishCommand(device: device, action: action, method: method);
+  }
+
   Future<bool> toggleDevice(Device device, {String method = 'app'}) async {
     final newState = !device.isOn;
-    final mqtt = ref.read(mqttServiceProvider);
-
-    final result = await mqtt.publishCommand(
-      device: device,
+    final result = await _command(
+      device,
       action: newState ? 'ON' : 'OFF',
       method: method,
     );
@@ -298,9 +331,8 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   Future<bool> setFanSpeed(Device device, int speed, {String method = 'app'}) async {
-    final mqtt = ref.read(mqttServiceProvider);
-    final result = await mqtt.publishCommand(
-      device: device,
+    final result = await _command(
+      device,
       action: 'SPEED_$speed',
       method: method,
     );
@@ -324,9 +356,8 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   Future<bool> setACTemperature(Device device, int temperature, {String method = 'app'}) async {
-    final mqtt = ref.read(mqttServiceProvider);
-    final result = await mqtt.publishCommand(
-      device: device,
+    final result = await _command(
+      device,
       action: 'TEMP_$temperature',
       method: method,
     );
