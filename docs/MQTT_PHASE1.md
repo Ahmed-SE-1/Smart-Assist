@@ -7,12 +7,13 @@ their simulation behaviour.
 Run with values supplied outside source control:
 
 ```powershell
-flutter run --dart-define=MQTT_ENABLE_REAL_TEST=true --dart-define=MQTT_HOST=<BROKER_LAN_IP> --dart-define=MQTT_PORT=8883 --dart-define=MQTT_USERNAME=<USERNAME> --dart-define=MQTT_PASSWORD=<SECRET> --dart-define=MQTT_CA_ASSET=<CA_ASSET_PATH> --dart-define=MQTT_TEST_APP_DEVICE_ID=<APP_LIGHT_ID> --dart-define=MQTT_TEST_DEVICE_ID=<BROKER_DEVICE_ID> --dart-define=MQTT_TEST_CHANNEL=1
+flutter run --dart-define=MQTT_ENABLED=true --dart-define=MQTT_HOST=<BROKER_HOST> --dart-define=MQTT_PORT=8883 --dart-define=MQTT_USERNAME=<USERNAME> --dart-define=MQTT_PASSWORD=<SECRET> --dart-define=MQTT_TEST_APP_DEVICE_ID=<APP_LIGHT_ID> --dart-define=MQTT_TEST_MQTT_DEVICE_ID=<BROKER_DEVICE_ID> --dart-define=MQTT_TEST_CHANNEL=1
 ```
 
-Add the real private-CA certificate asset yourself and register it in
-`pubspec.yaml`; no fake certificate is included. TLS certificate validation is
-never disabled.
+The registered `assets/certs/emqx_ca.crt` asset is used by default. Override
+its path with `MQTT_CA_ASSET` only when needed. TLS certificate validation is
+never disabled. `MQTT_ENABLE_REAL_TEST` and `MQTT_TEST_DEVICE_ID` remain
+supported as legacy define names.
 
 On the broker machine, inspect commands with:
 

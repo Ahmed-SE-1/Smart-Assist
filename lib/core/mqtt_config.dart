@@ -10,12 +10,24 @@ class MqttConfig {
     this.username = const String.fromEnvironment('MQTT_USERNAME'),
     this.password = const String.fromEnvironment('MQTT_PASSWORD'),
     this.clientId = const String.fromEnvironment('MQTT_CLIENT_ID'),
-    this.caAsset = const String.fromEnvironment('MQTT_CA_ASSET'),
+    this.caAsset = const String.fromEnvironment(
+      'MQTT_CA_ASSET',
+      defaultValue: 'assets/certs/emqx_ca.crt',
+    ),
     this.testAppDeviceId = const String.fromEnvironment('MQTT_TEST_APP_DEVICE_ID'),
-    this.testMqttDeviceId = const String.fromEnvironment('MQTT_TEST_DEVICE_ID'),
+    this.testMqttDeviceId = const String.fromEnvironment(
+      'MQTT_TEST_MQTT_DEVICE_ID',
+      defaultValue: const String.fromEnvironment('MQTT_TEST_DEVICE_ID'),
+    ),
     this.testChannel = const int.fromEnvironment('MQTT_TEST_CHANNEL'),
   }) : enabled = enabled ??
-            const bool.fromEnvironment('MQTT_ENABLE_REAL_TEST', defaultValue: false);
+            const bool.fromEnvironment(
+              'MQTT_ENABLED',
+              defaultValue: const bool.fromEnvironment(
+                'MQTT_ENABLE_REAL_TEST',
+                defaultValue: false,
+              ),
+            );
 
   final bool enabled;
   final String host;

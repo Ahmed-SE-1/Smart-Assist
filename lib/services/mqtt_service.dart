@@ -49,6 +49,7 @@ class MqttService {
         ? configuredId
         : 'smartassist-flutter-${_randomSuffix()}';
     final client = MqttServerClient.withPort(_config.host, clientId, _config.port);
+    client.setProtocolV311();
     client.secure = true;
     client.keepAlivePeriod = 30;
     client.autoReconnect = true;
@@ -70,12 +71,17 @@ class MqttService {
       client.connectionMessage = MqttConnectMessage()
           .withClientIdentifier(clientId)
           .authenticateAs(_config.username, _config.password)
-          .startClean()
-          .withWillQos(MqttQos.atLeastOnce);
+          .startClean();
 
-      _log('MQTT connecting to ${_config.host}:${_config.port}');
+      _log(
+        'MQTT config: protocol=3.1.1 tls=${client.secure} '
+        'host=${_config.host} port=${_config.port} caAsset=${_config.caAsset}',
+      );
+      _log('MQTT connecting');
       await client.connect();
-      if (client.connectionStatus?.state != MqttConnectionState.connected) {
+      final connectionStatus = client.connectionStatus;
+      _log('MQTT connection outcome: state=${connectionStatus?.state}');
+      if (connectionStatus?.state != MqttConnectionState.connected) {
         client.disconnect();
         return _result(false, 'MQTT connection was rejected by the broker.');
       }
