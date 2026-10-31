@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/device.dart';
+import '../../models/room.dart';
 import '../../providers/smart_home_provider.dart';
 import '../../providers/accessibility_provider.dart';
 
@@ -45,16 +46,28 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             icon: const Icon(Icons.more_vert, color: Color(0xFF2D3436)),
             onSelected: (value) {
               if (value == 'edit') {
-                _showEditRoomDialog(room.id, room.name, room.iconAsset);
+                _showEditRoomDialog(
+                  room.id,
+                  room.name,
+                  room.iconAsset,
+                  room.mqttNodeId,
+                );
               } else if (value == 'delete') {
                 ref.read(roomsProvider.notifier).removeRoom(room.id);
                 context.pop();
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit Room')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete Room', style: TextStyle(color: Colors.red))),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit Room')),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text(
+                      'Delete Room',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
           ),
         ],
       ),
@@ -72,8 +85,16 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${devices.length} Devices • Node: ${room.esp32NodeId}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              room.mqttNodeId == null
+                  ? '${devices.length} Devices • ${room.esp32NodeId} • ESP32 not mapped'
+                  : '${devices.length} Devices • ${room.mqttNodeId}',
+              style: TextStyle(
+                color:
+                    room.mqttNodeId == null
+                        ? Colors.orange.shade800
+                        : Colors.grey.shade600,
+                fontSize: 14,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -83,11 +104,27 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   padding: const EdgeInsets.all(48.0),
                   child: Column(
                     children: [
-                      Icon(Icons.devices_other, size: 64, color: Colors.grey.shade300),
+                      Icon(
+                        Icons.devices_other,
+                        size: 64,
+                        color: Colors.grey.shade300,
+                      ),
                       const SizedBox(height: 16),
-                      Text('No devices yet', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                      Text(
+                        'No devices yet',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 16,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      Text('Tap + to add a device', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+                      Text(
+                        'Tap + to add a device',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -116,10 +153,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   /// Helper to get the correct icon for a device type.
   IconData _getIconForType(DeviceType type) {
     switch (type) {
-      case DeviceType.light: return Icons.lightbulb_outline;
-      case DeviceType.fan: return Icons.air;
-      case DeviceType.ac: return Icons.ac_unit;
-      case DeviceType.sensor: return Icons.sensors;
+      case DeviceType.light:
+        return Icons.lightbulb_outline;
+      case DeviceType.fan:
+        return Icons.air;
+      case DeviceType.ac:
+        return Icons.ac_unit;
+      case DeviceType.sensor:
+        return Icons.sensors;
     }
   }
 
@@ -132,19 +173,36 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Row(
         children: [
-          Icon(Icons.lightbulb_outline, color: device.isOn ? Colors.orange : Colors.grey, size: 32),
+          Icon(
+            Icons.lightbulb_outline,
+            color: device.isOn ? Colors.orange : Colors.grey,
+            size: 32,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(device.isOn ? 'ON' : 'OFF', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                Text(
+                  device.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  device.isOn ? 'ON' : 'OFF',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -168,21 +226,41 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.air, color: device.isOn ? Colors.teal : Colors.grey, size: 32),
+              Icon(
+                Icons.air,
+                color: device.isOn ? Colors.teal : Colors.grey,
+                size: 32,
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(device.isOn ? 'Speed ${device.fanSpeed}' : 'OFF', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                    Text(
+                      device.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      device.isOn ? 'Speed ${device.fanSpeed}' : 'OFF',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -195,9 +273,19 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          Text(
+            'Speed stays in the app. The ESP32 only receives fan ON/OFF on channel 1.',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
           Row(
             children: [
-              Text('Spd ${device.fanSpeed}', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+              Text(
+                'Spd ${device.fanSpeed}',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               Expanded(
                 child: Semantics(
                   label: '${device.name} Speed Control',
@@ -208,7 +296,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     value: device.fanSpeed.toDouble(),
                     min: DeviceControlLimits.fanOffSpeed.toDouble(),
                     max: DeviceControlLimits.maxFanSpeed.toDouble(),
-                    divisions: (DeviceControlLimits.maxFanSpeed -
+                    divisions:
+                        (DeviceControlLimits.maxFanSpeed -
                             DeviceControlLimits.fanOffSpeed) ~/
                         DeviceControlLimits.fanSpeedStep,
                     label: '${device.fanSpeed}',
@@ -234,27 +323,53 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.ac_unit, color: device.isOn ? Colors.blue : Colors.grey, size: 32),
+              Icon(
+                Icons.ac_unit,
+                color: device.isOn ? Colors.blue : Colors.grey,
+                size: 32,
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(device.isOn ? '${device.acTemperature}°C' : 'OFF', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                    Text(
+                      device.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      device.isOn ? '${device.acTemperature}°C' : 'OFF',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
               Row(
                 children: [
-                  Text('${device.acTemperature}°C', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    '${device.acTemperature}°C',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Switch(
                     value: device.isOn,
@@ -268,9 +383,16 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
           ),
           if (device.isOn) ...[
             const SizedBox(height: 16),
+            Text(
+              'Temperature stays in the app. The ESP32 firmware has no AC command.',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
             Row(
               children: [
-                const Text('16°C', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text(
+                  '16°C',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 Expanded(
                   child: Semantics(
                     label: '${device.name} Temperature Control',
@@ -279,7 +401,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       value: device.acTemperature.toDouble(),
                       min: DeviceControlLimits.minAcTemperature.toDouble(),
                       max: DeviceControlLimits.maxAcTemperature.toDouble(),
-                      divisions: (DeviceControlLimits.maxAcTemperature -
+                      divisions:
+                          (DeviceControlLimits.maxAcTemperature -
                               DeviceControlLimits.minAcTemperature) ~/
                           DeviceControlLimits.acTemperatureStep,
                       label: '${device.acTemperature}°C',
@@ -289,7 +412,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     ),
                   ),
                 ),
-                const Text('30°C', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text(
+                  '30°C',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
           ],
@@ -301,12 +427,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   /// Builds a read-only card that displays live sensor telemetry (e.g. Temperature, Motion).
   Widget _buildSensorCard(Device device) {
     final isMot = device.sensorType == 'motion';
-    final displayVal = isMot
-        ? (device.sensorValue > 0.5 ? 'Motion Detected' : 'No Motion')
-        : '${device.sensorValue.toStringAsFixed(1)}°C';
-    final color = isMot
-        ? (device.sensorValue > 0.5 ? Colors.red : Colors.green)
-        : (device.sensorValue > 30 ? Colors.orange : Colors.green);
+    final displayVal =
+        isMot
+            ? (device.sensorValue > 0.5 ? 'Motion Detected' : 'No Motion')
+            : '${device.sensorValue.toStringAsFixed(1)}°C';
+    final color =
+        isMot
+            ? (device.sensorValue > 0.5 ? Colors.red : Colors.green)
+            : (device.sensorValue > 30 ? Colors.orange : Colors.green);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -315,7 +443,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Row(
@@ -326,8 +458,17 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(device.sensorType.toUpperCase(), style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                Text(
+                  device.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  device.sensorType.toUpperCase(),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -337,7 +478,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(displayVal, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+            child: Text(
+              displayVal,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 14,
+              ),
+            ),
           ),
           _buildDeviceOptions(device),
         ],
@@ -347,24 +495,25 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
   /// Communicates with the SmartHome provider to toggle a device ON/OFF and speaks TTS feedback.
   Future<void> _toggleDevice(Device device) async {
-    final success = await ref.read(devicesProvider.notifier).toggleDevice(device);
+    final success = await ref
+        .read(devicesProvider.notifier)
+        .toggleDevice(device);
+    final detail = ref.read(devicesProvider.notifier).lastCommandMessage;
     if (mounted) {
       if (success) {
-        // Yahan status variable declare karna zaroori hai
         final status = !device.isOn ? "ON" : "OFF";
+        final sent = detail ?? '${device.name}: $status command sent.';
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            // Yahan bhi hum ab direct variable use kar sakte hain
-            content: Text('${device.name} is now $status'),
-            duration: const Duration(seconds: 1),
-          ),
+          SnackBar(content: Text(sent), duration: const Duration(seconds: 2)),
         );
-        // == TTS ==
-        ref.read(ttsServiceProvider).speak("${device.name} is turned $status in ${widget.roomName}");
+        ref.read(ttsServiceProvider).speak("$sent in ${widget.roomName}");
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(detail ?? 'Device not responding'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -372,29 +521,41 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
   /// Updates the rotational speed of a Fan device via the SmartHome provider.
   Future<void> _setFanSpeed(Device device, int speed) async {
-    final success = await ref.read(devicesProvider.notifier).setFanSpeed(device, speed);
+    final success = await ref
+        .read(devicesProvider.notifier)
+        .setFanSpeed(device, speed);
+    final detail = ref.read(devicesProvider.notifier).lastCommandMessage;
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(detail ?? 'Device not responding'),
+          backgroundColor: Colors.red,
+        ),
       );
-    }
-    else {
+    } else {
       // === TTS FOR FAN SPEED ===
       ref.read(ttsServiceProvider).speak("${device.name} speed set to $speed");
-  }
+    }
   }
 
   /// Updates the target temperature of an AC unit via the SmartHome provider.
   Future<void> _setACTemperature(Device device, int temperature) async {
-    final success = await ref.read(devicesProvider.notifier).setACTemperature(device, temperature);
+    final success = await ref
+        .read(devicesProvider.notifier)
+        .setACTemperature(device, temperature);
+    final detail = ref.read(devicesProvider.notifier).lastCommandMessage;
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Device not responding'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(detail ?? 'Device not responding'),
+          backgroundColor: Colors.red,
+        ),
       );
-    }
-    else {
+    } else {
       // === TTS FOR AC TEMP ===
-      ref.read(ttsServiceProvider).speak("${device.name} temperature set to $temperature degrees");
+      ref
+          .read(ttsServiceProvider)
+          .speak("${device.name} temperature set to $temperature degrees");
     }
   }
 
@@ -405,106 +566,191 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Add New Device', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    labelText: 'Device Name',
-                    hintText: 'e.g., Ceiling Fan',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDialogState) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Select Device Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: DeviceType.values.map((type) {
-                    final isSelected = selectedType == type;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => selectedType = type),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
-                              : [],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_getIconForType(type), size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              type.name[0].toUpperCase() + type.name.substring(1),
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey.shade800,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  title: const Text(
+                    'Add New Device',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              labelText: 'Device Name',
+                              hintText: 'e.g., Ceiling Fan',
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Select Device Type',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children:
+                                DeviceType.values.map((type) {
+                                  final isSelected = selectedType == type;
+                                  return GestureDetector(
+                                    onTap:
+                                        () => setDialogState(
+                                          () => selectedType = type,
+                                        ),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                                : Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow:
+                                            isSelected
+                                                ? [
+                                                  BoxShadow(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ]
+                                                : [],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _getIconForType(type),
+                                            size: 20,
+                                            color:
+                                                isSelected
+                                                    ? Colors.white
+                                                    : Colors.grey.shade700,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            type.name[0].toUpperCase() +
+                                                type.name.substring(1),
+                                            style: TextStyle(
+                                              color:
+                                                  isSelected
+                                                      ? Colors.white
+                                                      : Colors.grey.shade800,
+                                              fontWeight:
+                                                  isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _relayChannelLabel(selectedType),
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.all(24),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (controller.text.trim().isEmpty) return;
+                        final error = ref
+                            .read(devicesProvider.notifier)
+                            .addDevice(controller.text, selectedType, roomId);
+                        if (error != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } else {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${controller.text} added!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  }).toList(),
+                      child: const Text('Add Device'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
-          actionsPadding: const EdgeInsets.all(24),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
-                final error = ref.read(devicesProvider.notifier).addDevice(controller.text, selectedType, roomId);
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                } else {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${controller.text} added!'), backgroundColor: Colors.green),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Add Device'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   /// Displays a modal to edit the current Room's metadata (Name and Icon).
-  void _showEditRoomDialog(String roomId, String currentName, String currentIconAsset) {
+  void _showEditRoomDialog(
+    String roomId,
+    String currentName,
+    String currentIconAsset,
+    String? currentMqttNodeId,
+  ) {
     final controller = TextEditingController(text: currentName);
     String selectedIcon = currentIconAsset;
+    String? selectedNode = currentMqttNodeId;
 
     final Map<String, Map<String, dynamic>> roomTypes = {
       'living_room': {'label': 'Living Room', 'icon': Icons.chair_outlined},
@@ -516,98 +762,193 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Edit Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    labelText: 'Room Name',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDialogState) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Select Room Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: roomTypes.entries.map((entry) {
-                    final isSelected = selectedIcon == entry.key;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => selectedIcon = entry.key),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
-                              : [],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(entry.value['icon'], size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              entry.value['label'],
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey.shade800,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  title: const Text(
+                    'Edit Room',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              labelText: 'Room Name',
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Select Room Type',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children:
+                                roomTypes.entries.map((entry) {
+                                  final isSelected = selectedIcon == entry.key;
+                                  return GestureDetector(
+                                    onTap:
+                                        () => setDialogState(
+                                          () => selectedIcon = entry.key,
+                                        ),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                                : Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow:
+                                            isSelected
+                                                ? [
+                                                  BoxShadow(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ]
+                                                : [],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            entry.value['icon'],
+                                            size: 20,
+                                            color:
+                                                isSelected
+                                                    ? Colors.white
+                                                    : Colors.grey.shade700,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            entry.value['label'],
+                                            style: TextStyle(
+                                              color:
+                                                  isSelected
+                                                      ? Colors.white
+                                                      : Colors.grey.shade800,
+                                              fontWeight:
+                                                  isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'ESP32 node',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Not mapped rooms do not publish MQTT commands.',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _mqttNodeChoices(
+                            selectedNode: selectedNode,
+                            onSelected:
+                                (nodeId) =>
+                                    setDialogState(() => selectedNode = nodeId),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.all(24),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (controller.text.trim().isEmpty) return;
+                        final error = ref
+                            .read(roomsProvider.notifier)
+                            .editRoom(
+                              roomId,
+                              controller.text,
+                              selectedIcon,
+                              mqttNodeId: selectedNode,
+                            );
+                        if (error != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } else {
+                          Navigator.pop(ctx);
+                          if (controller.text != currentName && mounted) {
+                            context.replace('/room/${controller.text}');
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  }).toList(),
+                      child: const Text('Save'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
-          actionsPadding: const EdgeInsets.all(24),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
-                final error = ref.read(roomsProvider.notifier).editRoom(roomId, controller.text, selectedIcon);
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                } else {
-                  Navigator.pop(ctx);
-                  if (controller.text != currentName && mounted) {
-                    context.replace('/room/${controller.text}');
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -622,10 +963,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
           ref.read(devicesProvider.notifier).removeDevice(device.id);
         }
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-        const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
-      ],
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem(value: 'edit', child: Text('Edit')),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
     );
   }
 
@@ -636,95 +981,228 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Edit Device', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    labelText: 'Device Name',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDialogState) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  title: const Text(
+                    'Edit Device',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            labelText: 'Device Name',
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Select Device Type',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children:
+                              DeviceType.values.map((type) {
+                                final isSelected = selectedType == type;
+                                return GestureDetector(
+                                  onTap:
+                                      () => setDialogState(
+                                        () => selectedType = type,
+                                      ),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isSelected
+                                              ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                              : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow:
+                                          isSelected
+                                              ? [
+                                                BoxShadow(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ]
+                                              : [],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _getIconForType(type),
+                                          size: 20,
+                                          color:
+                                              isSelected
+                                                  ? Colors.white
+                                                  : Colors.grey.shade700,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          type.name[0].toUpperCase() +
+                                              type.name.substring(1),
+                                          style: TextStyle(
+                                            color:
+                                                isSelected
+                                                    ? Colors.white
+                                                    : Colors.grey.shade800,
+                                            fontWeight:
+                                                isSelected
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _relayChannelLabel(selectedType),
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Select Device Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: DeviceType.values.map((type) {
-                    final isSelected = selectedType == type;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => selectedType = type),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
-                              : [],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_getIconForType(type), size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              type.name[0].toUpperCase() + type.name.substring(1),
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey.shade800,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
+                  actionsPadding: const EdgeInsets.all(24),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (controller.text.trim().isEmpty) return;
+                        final error = ref
+                            .read(devicesProvider.notifier)
+                            .editDevice(
+                              device.id,
+                              controller.text,
+                              selectedType,
+                            );
+                        if (error != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red,
                             ),
-                          ],
+                          );
+                        } else {
+                          Navigator.pop(ctx);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  }).toList(),
+                      child: const Text('Save'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
-          actionsPadding: const EdgeInsets.all(24),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
-                final error = ref.read(devicesProvider.notifier).editDevice(device.id, controller.text, selectedType);
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                } else {
-                  Navigator.pop(ctx);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  String _relayChannelLabel(DeviceType type) {
+    switch (type) {
+      case DeviceType.fan:
+        return 'Relay channel 1. Saving a fan assigns this channel.';
+      case DeviceType.light:
+        return 'Relay channel 2. Saving a light assigns this channel.';
+      case DeviceType.ac:
+        return 'No relay channel. AC controls stay in the app.';
+      case DeviceType.sensor:
+        return 'No relay channel. This sensor is not read from the ESP32.';
+    }
+  }
+
+  Widget _mqttNodeChoices({
+    required String? selectedNode,
+    required ValueChanged<String?> onSelected,
+  }) {
+    final choices = <String?, String>{
+      null: 'Not mapped',
+      Room.room1NodeId: Room.room1NodeId,
+      Room.room2NodeId: Room.room2NodeId,
+    };
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children:
+          choices.entries.map((entry) {
+            final isSelected = selectedNode == entry.key;
+            return GestureDetector(
+              onTap: () => onSelected(entry.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey.shade800,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
               ),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+            );
+          }).toList(),
     );
   }
 }

@@ -1,15 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/gesture_control/widgets/control_nav_button.dart';
+import '../../providers/smart_home_provider.dart';
 
-class MainLayout extends StatelessWidget {
+class MainLayout extends ConsumerWidget {
   final Widget child;
 
   const MainLayout({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(mqttEventBridgeProvider);
+    ref.listen(pirNoticeProvider, (previous, next) {
+      if (next.isEmpty) return;
+      if (previous != null && previous.length == next.length) return;
+      final notice = next.last;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          content: Semantics(
+            label: '${notice.title}. ${notice.message}',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notice.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(notice.message),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
     final primaryColor = Theme.of(context).colorScheme.primary;
     final selectedIndex = _calculateSelectedIndex(context);
     final isControlActive = selectedIndex == 2;
@@ -36,19 +63,44 @@ class MainLayout extends StatelessWidget {
           unselectedItemColor: Colors.grey.shade400,
           showSelectedLabels: true,
           showUnselectedLabels: true,
-          selectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 12),
           elevation: 0,
           items: [
-            const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
-            const BottomNavigationBarItem(icon: Icon(Icons.grid_view), activeIcon: Icon(Icons.grid_view_rounded), label: 'Rooms'),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view),
+              activeIcon: Icon(Icons.grid_view_rounded),
+              label: 'Rooms',
+            ),
             BottomNavigationBarItem(
-              icon: ControlNavButton(isActive: isControlActive, primaryColor: primaryColor),
-              activeIcon: ControlNavButton(isActive: true, primaryColor: primaryColor),
+              icon: ControlNavButton(
+                isActive: isControlActive,
+                primaryColor: primaryColor,
+              ),
+              activeIcon: ControlNavButton(
+                isActive: true,
+                primaryColor: primaryColor,
+              ),
               label: 'Control',
             ),
-            const BottomNavigationBarItem(icon: Icon(Icons.notifications_none), activeIcon: Icon(Icons.notifications), label: 'Alerts'),
-            const BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_none),
+              activeIcon: Icon(Icons.notifications),
+              label: 'Alerts',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
           ],
         ),
       ),
@@ -57,7 +109,10 @@ class MainLayout extends StatelessWidget {
 
   static int _calculateSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    if (location.startsWith('/home/voice') || location.startsWith('/home/gesture')) return 2;
+    if (location.startsWith('/home/voice') ||
+        location.startsWith('/home/gesture')) {
+      return 2;
+    }
     if (location.startsWith('/home')) return 0;
     if (location.startsWith('/automation')) return 1;
     if (location.startsWith('/alerts')) return 3;

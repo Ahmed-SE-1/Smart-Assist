@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/activity_log.dart';
 import '../models/device.dart';
+import '../models/pir_motion_event.dart';
 import '../models/room.dart';
 import '../models/user.dart';
 import '../services/iot_simulation_service.dart';
@@ -45,9 +46,31 @@ class RoomsNotifier extends Notifier<List<Room>> {
     if (data != null) {
       final List decoded = jsonDecode(data);
       state = decoded.map((e) => Room.fromMap(e)).toList();
+      _nodeCounter = Room.highestEsp32Counter(state);
     } else {
       state = [];
     }
+  }
+
+  String? _normalizedMqttNodeId(String? mqttNodeId) {
+    final trimmed = mqttNodeId?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
+  String? _mqttNodeError(String? mqttNodeId, {String? exceptRoomId}) {
+    final normalized = _normalizedMqttNodeId(mqttNodeId);
+    if (normalized == null) return null;
+    if (!Room.isSupportedMqttNodeId(normalized)) {
+      return 'Choose ROOM1_NODE or ROOM2_NODE.';
+    }
+    final taken = state.any(
+      (room) => room.id != exceptRoomId && room.mqttNodeId == normalized,
+    );
+    if (taken) {
+      return '$normalized is already assigned to another room.';
+    }
+    return null;
   }
 
   Future<void> _saveRooms() async {
@@ -56,15 +79,26 @@ class RoomsNotifier extends Notifier<List<Room>> {
     await prefs.setString(getStorageKey(), encoded);
   }
 
-  String? addRoom(String name, String iconAsset, String creatorId, String creatorName) {
+  String? addRoom(
+    String name,
+    String iconAsset,
+    String creatorId,
+    String creatorName, {
+    String? mqttNodeId,
+  }) {
     if (name.trim().isEmpty) return 'Room name cannot be empty';
     if (state.length >= 5) return 'Maximum 5 rooms allowed';
 
-    final isDuplicate = state.any((r) => r.name.trim().toLowerCase() == name.trim().toLowerCase());
+    final isDuplicate = state.any(
+      (r) => r.name.trim().toLowerCase() == name.trim().toLowerCase(),
+    );
     if (isDuplicate) {
       return 'Room "$name" already exists. Please choose a different name.';
     }
+    final nodeError = _mqttNodeError(mqttNodeId);
+    if (nodeError != null) return nodeError;
 
+    _nodeCounter = Room.highestEsp32Counter(state);
     _nodeCounter++;
     final nodeId = 'NODE_${_nodeCounter.toString().padLeft(3, '0')}';
 
@@ -73,6 +107,7 @@ class RoomsNotifier extends Notifier<List<Room>> {
       name: name.trim(),
       iconAsset: iconAsset,
       esp32NodeId: nodeId,
+      mqttNodeId: _normalizedMqttNodeId(mqttNodeId),
       creatorId: creatorId,
       creatorName: creatorName,
     );
@@ -82,17 +117,35 @@ class RoomsNotifier extends Notifier<List<Room>> {
     return null;
   }
 
-  String? editRoom(String id, String name, String iconAsset) {
+  String? editRoom(
+    String id,
+    String name,
+    String iconAsset, {
+    String? mqttNodeId,
+  }) {
     if (name.trim().isEmpty) return 'Room name cannot be empty';
 
-    if (state.any((r) => r.id != id && r.name.trim().toLowerCase() == name.trim().toLowerCase())) {
+    if (state.any(
+      (r) =>
+          r.id != id &&
+          r.name.trim().toLowerCase() == name.trim().toLowerCase(),
+    )) {
       return 'Room "$name" already exists. Please choose a different name.';
     }
+    final nodeError = _mqttNodeError(mqttNodeId, exceptRoomId: id);
+    if (nodeError != null) return nodeError;
 
-    state = state.map((r) {
-      if (r.id == id) return r.copyWith(name: name.trim(), iconAsset: iconAsset);
-      return r;
-    }).toList();
+    state =
+        state.map((r) {
+          if (r.id == id) {
+            return r.copyWith(
+              name: name.trim(),
+              iconAsset: iconAsset,
+              mqttNodeId: _normalizedMqttNodeId(mqttNodeId),
+            );
+          }
+          return r;
+        }).toList();
     _saveRooms();
     return null;
   }
@@ -199,21 +252,22 @@ class DevicesNotifier extends Notifier<List<Device>> {
       final currentDevices = state;
       bool changed = false;
 
-      final newDevices = currentDevices.map((d) {
-        if (d.type == DeviceType.sensor) {
-          final newValue = iot.generateSensorValue(
-            d.sensorType,
-            d.sensorValue,
-          );
-          if (newValue != d.sensorValue) {
-            changed = true;
-            return d.copyWith(
-              sensorValue: double.parse(newValue.toStringAsFixed(1)),
-            );
-          }
-        }
-        return d;
-      }).toList();
+      final newDevices =
+          currentDevices.map((d) {
+            if (d.type == DeviceType.sensor) {
+              final newValue = iot.generateSensorValue(
+                d.sensorType,
+                d.sensorValue,
+              );
+              if (newValue != d.sensorValue) {
+                changed = true;
+                return d.copyWith(
+                  sensorValue: double.parse(newValue.toStringAsFixed(1)),
+                );
+              }
+            }
+            return d;
+          }).toList();
 
       if (changed) {
         state = newDevices;
@@ -224,7 +278,8 @@ class DevicesNotifier extends Notifier<List<Device>> {
   String? addDevice(String name, DeviceType type, String roomId) {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
-    final sensorType = type == DeviceType.sensor ? 'temperature' : 'temperature';
+    final sensorType =
+        type == DeviceType.sensor ? 'temperature' : 'temperature';
     final device = Device(
       id: _uuid.v4(),
       name: name.trim(),
@@ -232,6 +287,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
       roomId: roomId,
       sensorValue: type == DeviceType.sensor ? 25.0 : 0.0,
       sensorType: sensorType,
+      channel: Device.channelForType(type),
     );
 
     state = [...state, device];
@@ -242,10 +298,18 @@ class DevicesNotifier extends Notifier<List<Device>> {
   String? editDevice(String id, String name, DeviceType type) {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
-    state = state.map((d) {
-      if (d.id == id) return d.copyWith(name: name.trim(), type: type);
-      return d;
-    }).toList();
+    state =
+        state.map((d) {
+          if (d.id == id) {
+            return d.copyWith(
+              name: name.trim(),
+              type: type,
+              applyChannel: true,
+              channel: Device.channelForType(type),
+            );
+          }
+          return d;
+        }).toList();
     _saveDevices();
     return null;
   }
@@ -269,6 +333,30 @@ class DevicesNotifier extends Notifier<List<Device>> {
 
   // --- HARDWARE INTERACTION METHODS --- //
 
+  String? lastCommandMessage;
+
+  Room? _roomFor(Device device) {
+    for (final room in ref.read(roomsProvider)) {
+      if (room.id == device.roomId) return room;
+    }
+    return null;
+  }
+
+  CommandResult _failed(
+    Device device,
+    String action,
+    String method,
+    String message,
+  ) => CommandResult(
+    success: false,
+    deviceId: device.id,
+    roomId: device.roomId,
+    action: action,
+    method: method,
+    timestamp: DateTime.now(),
+    message: message,
+  );
+
   Future<CommandResult> _command(
     Device device, {
     required String action,
@@ -276,32 +364,133 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }) async {
     final mqtt = ref.read(mqttServiceProvider);
     final config = ref.read(mqttConfigProvider);
-    final isMappedPhaseOneDevice = config.enabled &&
-        device.id == config.testAppDeviceId &&
-        device.type == DeviceType.light &&
-        (action == 'ON' || action == 'OFF');
+    final isOnOff = action == 'ON' || action == 'OFF';
+    final isRelay = Device.isRelayType(device.type);
 
-    if (isMappedPhaseOneDevice) {
-      final mappingError = config.mappingError;
-      if (mappingError != null) {
-        return CommandResult(
-          success: false,
-          deviceId: device.id,
-          roomId: device.roomId,
-          action: action,
-          method: method,
-          timestamp: DateTime.now(),
-          message: mappingError,
+    if (config.enabled && isOnOff && isRelay) {
+      final room = _roomFor(device);
+      final nodeId = room?.mqttNodeId?.trim();
+      final hasExplicitNode = nodeId != null && nodeId.isNotEmpty;
+      if (hasExplicitNode || device.channel != null) {
+        if (!hasExplicitNode) {
+          return _failed(
+            device,
+            action,
+            method,
+            'This room is not mapped to an ESP32 node.',
+          );
+        }
+        if (!Room.isSupportedMqttNodeId(nodeId)) {
+          return _failed(
+            device,
+            action,
+            method,
+            'This room is not mapped to an ESP32 node.',
+          );
+        }
+        if (!Device.isChannelCompatible(device.type, device.channel)) {
+          return _failed(
+            device,
+            action,
+            method,
+            'This ${device.type.name} does not have a valid relay channel.',
+          );
+        }
+        return mqtt.publishDeviceCommand(
+          houseId: ref.read(userProvider)?.houseId?.trim() ?? '',
+          mqttDeviceId: nodeId,
+          channel: device.channel!,
+          state: action,
         );
       }
-      return mqtt.publishDeviceCommand(
-        houseId: ref.read(userProvider)?.houseId?.trim() ?? '',
-        mqttDeviceId: config.testMqttDeviceId,
-        channel: config.testChannel,
-        state: action,
+
+      final legacyMatch =
+          device.type == DeviceType.light &&
+          device.id == config.testAppDeviceId &&
+          config.mappingError == null &&
+          config.testChannel == Device.channelForType(DeviceType.light) &&
+          Room.isSupportedMqttNodeId(config.testMqttDeviceId);
+      if (legacyMatch) {
+        return mqtt.publishDeviceCommand(
+          houseId: ref.read(userProvider)?.houseId?.trim() ?? '',
+          mqttDeviceId: config.testMqttDeviceId.trim(),
+          channel: config.testChannel,
+          state: action,
+        );
+      }
+
+      return _failed(
+        device,
+        action,
+        method,
+        'This room is not mapped to an ESP32 node.',
       );
     }
+
     return mqtt.publishCommand(device: device, action: action, method: method);
+  }
+
+  /// Applies a PIR event already parsed from MQTT. Does not publish a command.
+  ///
+  /// A repeated event that does not change the light is ignored so the UI does
+  /// not raise the same automation SnackBar again. Manual controls do not call
+  /// this method.
+  bool applyPirMotionEvent(PirMotionEvent event) {
+    Room? room;
+    for (final candidate in ref.read(roomsProvider)) {
+      if (candidate.mqttNodeId == event.mqttNodeId) {
+        room = candidate;
+        break;
+      }
+    }
+    if (room == null) return false;
+
+    final lights =
+        state
+            .where(
+              (device) =>
+                  device.roomId == room!.id &&
+                  device.type == DeviceType.light &&
+                  Device.isChannelCompatible(device.type, device.channel),
+            )
+            .toList();
+    if (lights.isEmpty) return false;
+    final changing =
+        lights.where((device) => device.isOn != event.lightOn).toList();
+    if (changing.isEmpty) return false;
+
+    final ids = changing.map((device) => device.id).toSet();
+    state =
+        state.map((device) {
+          if (ids.contains(device.id)) {
+            return device.copyWith(isOn: event.lightOn);
+          }
+          return device;
+        }).toList();
+    _saveDevices();
+
+    for (final light in changing) {
+      ref
+          .read(activityLogProvider.notifier)
+          .addLog(
+            deviceId: light.id,
+            deviceName: light.name,
+            roomId: light.roomId,
+            action: event.lightOn ? 'ON' : 'OFF',
+            method: 'pir',
+          );
+    }
+    ref
+        .read(pirNoticeProvider.notifier)
+        .show(
+          PirAutomationNotice.forRoom(
+            roomId: room.id,
+            roomName: room.name,
+            deviceId: changing.first.id,
+            lightOn: event.lightOn,
+          ),
+        );
+    return true;
   }
 
   Future<bool> toggleDevice(Device device, {String method = 'app'}) async {
@@ -311,71 +500,95 @@ class DevicesNotifier extends Notifier<List<Device>> {
       action: newState ? 'ON' : 'OFF',
       method: method,
     );
+    lastCommandMessage = result.message;
 
     if (result.success) {
-      state = state.map((d) {
-        if (d.id == device.id) return d.copyWith(isOn: newState);
-        return d;
-      }).toList();
+      state =
+          state.map((d) {
+            if (d.id == device.id) return d.copyWith(isOn: newState);
+            return d;
+          }).toList();
       _saveDevices();
 
-      ref.read(activityLogProvider.notifier).addLog(
-        deviceId: device.id,
-        deviceName: device.name,
-        roomId: device.roomId,
-        action: newState ? 'ON' : 'OFF',
-        method: method,
-      );
+      ref
+          .read(activityLogProvider.notifier)
+          .addLog(
+            deviceId: device.id,
+            deviceName: device.name,
+            roomId: device.roomId,
+            action: newState ? 'ON' : 'OFF',
+            method: method,
+          );
     }
     return result.success;
   }
 
-  Future<bool> setFanSpeed(Device device, int speed, {String method = 'app'}) async {
+  Future<bool> setFanSpeed(
+    Device device,
+    int speed, {
+    String method = 'app',
+  }) async {
     final result = await _command(
       device,
       action: 'SPEED_$speed',
       method: method,
     );
+    lastCommandMessage = result.message;
 
     if (result.success) {
-      state = state.map((d) {
-        if (d.id == device.id) return d.copyWith(fanSpeed: speed, isOn: speed > 0);
-        return d;
-      }).toList();
+      state =
+          state.map((d) {
+            if (d.id == device.id) {
+              return d.copyWith(fanSpeed: speed, isOn: speed > 0);
+            }
+            return d;
+          }).toList();
       _saveDevices();
 
-      ref.read(activityLogProvider.notifier).addLog(
-        deviceId: device.id,
-        deviceName: device.name,
-        roomId: device.roomId,
-        action: 'SPEED_$speed',
-        method: method,
-      );
+      ref
+          .read(activityLogProvider.notifier)
+          .addLog(
+            deviceId: device.id,
+            deviceName: device.name,
+            roomId: device.roomId,
+            action: 'SPEED_$speed',
+            method: method,
+          );
     }
     return result.success;
   }
 
-  Future<bool> setACTemperature(Device device, int temperature, {String method = 'app'}) async {
+  Future<bool> setACTemperature(
+    Device device,
+    int temperature, {
+    String method = 'app',
+  }) async {
     final result = await _command(
       device,
       action: 'TEMP_$temperature',
       method: method,
     );
+    lastCommandMessage = result.message;
 
     if (result.success) {
-      state = state.map((d) {
-        if (d.id == device.id) return d.copyWith(acTemperature: temperature);
-        return d;
-      }).toList();
+      state =
+          state.map((d) {
+            if (d.id == device.id) {
+              return d.copyWith(acTemperature: temperature);
+            }
+            return d;
+          }).toList();
       _saveDevices();
 
-      ref.read(activityLogProvider.notifier).addLog(
-        deviceId: device.id,
-        deviceName: device.name,
-        roomId: device.roomId,
-        action: 'TEMP_$temperature',
-        method: method,
-      );
+      ref
+          .read(activityLogProvider.notifier)
+          .addLog(
+            deviceId: device.id,
+            deviceName: device.name,
+            roomId: device.roomId,
+            action: 'TEMP_$temperature',
+            method: method,
+          );
     }
     return result.success;
   }
@@ -392,10 +605,11 @@ class DevicesNotifier extends Notifier<List<Device>> {
     switch (device.type) {
       case DeviceType.fan:
         final current = device.fanSpeed;
-        final next = current < DeviceControlLimits.minRunningFanSpeed ||
-                current >= DeviceControlLimits.maxFanSpeed
-            ? DeviceControlLimits.minRunningFanSpeed
-            : current + DeviceControlLimits.fanSpeedStep;
+        final next =
+            current < DeviceControlLimits.minRunningFanSpeed ||
+                    current >= DeviceControlLimits.maxFanSpeed
+                ? DeviceControlLimits.minRunningFanSpeed
+                : current + DeviceControlLimits.fanSpeedStep;
         // The manual fan slider is active while OFF; its setter handles power.
         final success = await setFanSpeed(device, next, method: method);
         return success
@@ -407,10 +621,11 @@ class DevicesNotifier extends Notifier<List<Device>> {
           return 'Turn ${device.name} ON before adjusting temperature.';
         }
         final current = device.acTemperature;
-        final next = current < DeviceControlLimits.minAcTemperature ||
-                current >= DeviceControlLimits.maxAcTemperature
-            ? DeviceControlLimits.minAcTemperature
-            : current + DeviceControlLimits.acTemperatureStep;
+        final next =
+            current < DeviceControlLimits.minAcTemperature ||
+                    current >= DeviceControlLimits.maxAcTemperature
+                ? DeviceControlLimits.minAcTemperature
+                : current + DeviceControlLimits.acTemperatureStep;
         final success = await setACTemperature(device, next, method: method);
         return success
             ? '${device.name} temperature set to $next degrees.'
@@ -422,13 +637,19 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   Future<bool> turnOn(String deviceId, {String method = 'app'}) async {
-    final device = state.firstWhere((d) => d.id == deviceId, orElse: () => throw Exception('Device not found'));
+    final device = state.firstWhere(
+      (d) => d.id == deviceId,
+      orElse: () => throw Exception('Device not found'),
+    );
     if (device.isOn) return true;
     return toggleDevice(device, method: method);
   }
 
   Future<bool> turnOff(String deviceId, {String method = 'app'}) async {
-    final device = state.firstWhere((d) => d.id == deviceId, orElse: () => throw Exception('Device not found'));
+    final device = state.firstWhere(
+      (d) => d.id == deviceId,
+      orElse: () => throw Exception('Device not found'),
+    );
     if (!device.isOn) return true;
     return toggleDevice(device, method: method);
   }
@@ -483,7 +704,41 @@ final devicesProvider = NotifierProvider<DevicesNotifier, List<Device>>(
   DevicesNotifier.new,
 );
 
-final devicesByRoomProvider = Provider.family<List<Device>, String>((ref, roomId) {
+class PirNoticeNotifier extends Notifier<List<PirAutomationNotice>> {
+  @override
+  List<PirAutomationNotice> build() => [];
+
+  void show(PirAutomationNotice notice) {
+    state = [...state, notice];
+  }
+}
+
+final pirNoticeProvider =
+    NotifierProvider<PirNoticeNotifier, List<PirAutomationNotice>>(
+      PirNoticeNotifier.new,
+    );
+
+/// Listens on the shared MQTT client while a house is signed in.
+final mqttEventBridgeProvider = Provider<void>((ref) {
+  final config = ref.watch(mqttConfigProvider);
+  final houseId = ref.watch(userProvider)?.houseId?.trim() ?? '';
+  final mqtt = ref.watch(mqttServiceProvider);
+  if (!config.enabled || houseId.isEmpty) return;
+
+  final subscription = mqtt.motionEvents.listen((event) {
+    ref.read(devicesProvider.notifier).applyPirMotionEvent(event);
+  });
+  mqtt.subscribeToHouseEvents(houseId);
+  ref.onDispose(() {
+    subscription.cancel();
+    mqtt.clearHouseEventSubscription();
+  });
+});
+
+final devicesByRoomProvider = Provider.family<List<Device>, String>((
+  ref,
+  roomId,
+) {
   final devices = ref.watch(devicesProvider);
   return devices.where((d) => d.roomId == roomId).toList();
 });
@@ -520,9 +775,10 @@ class ActivityLogNotifier extends Notifier<List<ActivityLog>> {
   }
 }
 
-final activityLogProvider = NotifierProvider<ActivityLogNotifier, List<ActivityLog>>(
-  ActivityLogNotifier.new,
-);
+final activityLogProvider =
+    NotifierProvider<ActivityLogNotifier, List<ActivityLog>>(
+      ActivityLogNotifier.new,
+    );
 
 // ═══════════════════════════════════════════
 // DASHBOARD UI HELPERS
@@ -530,14 +786,17 @@ final activityLogProvider = NotifierProvider<ActivityLogNotifier, List<ActivityL
 
 final activeDeviceCountProvider = Provider<int>((ref) {
   final devices = ref.watch(devicesProvider);
-  return devices.where((d) => d.isOn && d.type != DeviceType.sensor).toList().length;
+  return devices
+      .where((d) => d.isOn && d.type != DeviceType.sensor)
+      .toList()
+      .length;
 });
 
 final temperatureProvider = Provider<double>((ref) {
   final devices = ref.watch(devicesProvider);
   try {
     final sensor = devices.firstWhere(
-          (d) => d.type == DeviceType.sensor && d.sensorType == 'temperature',
+      (d) => d.type == DeviceType.sensor && d.sensorType == 'temperature',
     );
     return sensor.sensorValue;
   } catch (_) {

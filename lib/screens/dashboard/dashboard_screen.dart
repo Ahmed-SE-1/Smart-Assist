@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/room.dart';
 import '../../models/user.dart';
 import '../../providers/smart_home_provider.dart';
 import '../../providers/user_provider.dart';
@@ -15,12 +16,18 @@ class DashboardScreen extends ConsumerWidget {
 
   IconData _roomIcon(String iconAsset) {
     switch (iconAsset) {
-      case 'living_room': return Icons.chair_outlined;
-      case 'bed': return Icons.bed_outlined;
-      case 'kitchen': return Icons.kitchen_outlined;
-      case 'bathroom': return Icons.bathtub_outlined;
-      case 'garage': return Icons.garage_outlined;
-      default: return Icons.home_outlined;
+      case 'living_room':
+        return Icons.chair_outlined;
+      case 'bed':
+        return Icons.bed_outlined;
+      case 'kitchen':
+        return Icons.kitchen_outlined;
+      case 'bathroom':
+        return Icons.bathtub_outlined;
+      case 'garage':
+        return Icons.garage_outlined;
+      default:
+        return Icons.home_outlined;
     }
   }
 
@@ -79,7 +86,10 @@ class DashboardScreen extends ConsumerWidget {
                       children: [
                         Text(
                           'Hello,',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Row(
@@ -87,7 +97,9 @@ class DashboardScreen extends ConsumerWidget {
                             Flexible(
                               child: Text(
                                 '${user?.name ?? "User"} 👋',
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF2D3436),
                                 ),
@@ -98,18 +110,28 @@ class DashboardScreen extends ConsumerWidget {
                             if (user?.role == UserRole.owner) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.5),
+                                  ),
                                 ),
                                 child: Text(
                                   'Owner',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                               ),
@@ -141,9 +163,22 @@ class DashboardScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Active Devices', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                          Text(
+                            'Active Devices',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text('$activeCount', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2D3436))),
+                          Text(
+                            '$activeCount',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D3436),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -159,13 +194,23 @@ class DashboardScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Temperature', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                          Text(
+                            'Temperature',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text('${temperature.toStringAsFixed(1)}°C',
+                          Text(
+                            '${temperature.toStringAsFixed(1)}°C',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: temperature > 30 ? Colors.red : const Color(0xFF2D3436),
+                              color:
+                                  temperature > 30
+                                      ? Colors.red
+                                      : const Color(0xFF2D3436),
                             ),
                           ),
                         ],
@@ -190,7 +235,12 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   TextButton(
                     onPressed: () => _showAddRoomDialog(context, ref),
-                    child: Text('+ Add', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                    child: Text(
+                      '+ Add',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -205,12 +255,15 @@ class DashboardScreen extends ConsumerWidget {
                   separatorBuilder: (_, __) => const SizedBox(width: 16),
                   itemBuilder: (context, index) {
                     final room = rooms[index];
-                    final roomDevices = ref.watch(devicesByRoomProvider(room.id));
+                    final roomDevices = ref.watch(
+                      devicesByRoomProvider(room.id),
+                    );
                     return _buildRoomCard(
                       context,
                       title: room.name,
                       devices: '${roomDevices.length} Devices',
-                      creatorName: room.creatorName, // <-- NAYA: Pass Creator Name
+                      creatorName:
+                          room.creatorName, // <-- NAYA: Pass Creator Name
                       icon: _roomIcon(room.iconAsset),
                       gradient: _roomGradient(index),
                       onTap: () => context.push('/room/${room.name}'),
@@ -268,6 +321,7 @@ class DashboardScreen extends ConsumerWidget {
   void _showAddRoomDialog(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
     String selectedIcon = 'living_room';
+    String? selectedNode;
 
     final Map<String, Map<String, dynamic>> roomTypes = {
       'living_room': {'label': 'Living Room', 'icon': Icons.chair_outlined},
@@ -279,123 +333,265 @@ class DashboardScreen extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Add New Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    labelText: 'Room Name',
-                    hintText: 'e.g., Master Bedroom',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder:
+                (ctx, setDialogState) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Select Room Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: roomTypes.entries.map((entry) {
-                    final isSelected = selectedIcon == entry.key;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => selectedIcon = entry.key),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: isSelected
-                              ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
-                              : [],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(entry.value['icon'], size: 20, color: isSelected ? Colors.white : Colors.grey.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              entry.value['label'],
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey.shade800,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  title: const Text(
+                    'Add New Room',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              labelText: 'Room Name',
+                              hintText: 'e.g., Master Bedroom',
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                          ],
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Select Room Type',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children:
+                                roomTypes.entries.map((entry) {
+                                  final isSelected = selectedIcon == entry.key;
+                                  return GestureDetector(
+                                    onTap:
+                                        () => setDialogState(
+                                          () => selectedIcon = entry.key,
+                                        ),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                                : Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow:
+                                            isSelected
+                                                ? [
+                                                  BoxShadow(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ]
+                                                : [],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            entry.value['icon'],
+                                            size: 20,
+                                            color:
+                                                isSelected
+                                                    ? Colors.white
+                                                    : Colors.grey.shade700,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            entry.value['label'],
+                                            style: TextStyle(
+                                              color:
+                                                  isSelected
+                                                      ? Colors.white
+                                                      : Colors.grey.shade800,
+                                              fontWeight:
+                                                  isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'ESP32 node',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Choose the physical node for this room, or leave it unmapped.',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children:
+                                <MapEntry<String?, String>>[
+                                  const MapEntry(null, 'Not mapped'),
+                                  const MapEntry(
+                                    Room.room1NodeId,
+                                    Room.room1NodeId,
+                                  ),
+                                  const MapEntry(
+                                    Room.room2NodeId,
+                                    Room.room2NodeId,
+                                  ),
+                                ].map((entry) {
+                                  final isSelected = selectedNode == entry.key;
+                                  return GestureDetector(
+                                    onTap:
+                                        () => setDialogState(
+                                          () => selectedNode = entry.key,
+                                        ),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                                : Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        entry.value,
+                                        style: TextStyle(
+                                          color:
+                                              isSelected
+                                                  ? Colors.white
+                                                  : Colors.grey.shade800,
+                                          fontWeight:
+                                              isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.all(24),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (controller.text.trim().isEmpty) return;
+
+                        final currentUser = ref.read(userProvider);
+                        final creatorId = currentUser?.id ?? '';
+                        final creatorName = currentUser?.name ?? 'Unknown';
+
+                        final error = ref
+                            .read(roomsProvider.notifier)
+                            .addRoom(
+                              controller.text,
+                              selectedIcon,
+                              creatorId,
+                              creatorName,
+                              mqttNodeId: selectedNode,
+                            );
+
+                        if (error != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } else {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${controller.text} added!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    );
-                  }).toList(),
+                      child: const Text('Add Room'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ),
-          actionsPadding: const EdgeInsets.all(24),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
-
-                // --- NAYA: Fetching current user details for Creator Info ---
-                final currentUser = ref.read(userProvider);
-                final creatorId = currentUser?.id ?? '';
-                final creatorName = currentUser?.name ?? 'Unknown';
-
-                // --- NAYA: Passing creator details to Notifier (addRoom base provider mein hi hota hai) ---
-                final error = ref.read(roomsProvider.notifier).addRoom(
-                  controller.text,
-                  selectedIcon,
-                  creatorId,
-                  creatorName,
-                );
-
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                } else {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${controller.text} added!'), backgroundColor: Colors.green),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Add Room'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   /// --- UPDATED: Added `creatorName` parameter and Badge UI ---
-  Widget _buildRoomCard(BuildContext context, {
+  Widget _buildRoomCard(
+    BuildContext context, {
     required String title,
     required String devices,
     required String creatorName,
     required IconData icon,
     required List<Color> gradient,
-    required VoidCallback onTap
+    required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -403,10 +599,18 @@ class DashboardScreen extends ConsumerWidget {
         width: 130, // Thora width barhaya hai badge fit karne ke liye
         padding: const EdgeInsets.all(12), // Padding thori adjust ki
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          gradient: LinearGradient(
+            colors: gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: gradient[0].withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
+            BoxShadow(
+              color: gradient[0].withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
           ],
         ),
         child: Column(
@@ -422,14 +626,21 @@ class DashboardScreen extends ConsumerWidget {
                 // --- CREATOR BADGE (constrained to prevent overflow) ---
                 Flexible(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       'By: $creatorName',
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -440,8 +651,22 @@ class DashboardScreen extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(devices, style: const TextStyle(color: Colors.white70, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  devices,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ],
@@ -450,7 +675,13 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildControlFeatureCard(BuildContext context, {required String title, required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _buildControlFeatureCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -459,7 +690,11 @@ class DashboardScreen extends ConsumerWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
           ],
         ),
         child: Column(
@@ -467,11 +702,22 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, color: color, size: 32),
             ),
             const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2D3436)), textAlign: TextAlign.center),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF2D3436),
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -490,13 +736,35 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.hourglass_top_rounded, size: 80, color: Colors.blue),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.hourglass_top_rounded,
+                  size: 80,
+                  color: Colors.blue,
+                ),
               ),
               const SizedBox(height: 32),
-              Text('Approval Pending', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF2D3436)), textAlign: TextAlign.center),
+              Text(
+                'Approval Pending',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2D3436),
+                ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
-              Text('Your account has been created successfully. Please wait for the House Owner to approve your join request to access the home controls.', style: TextStyle(fontSize: 16, color: Colors.grey.shade600, height: 1.5), textAlign: TextAlign.center),
+              Text(
+                'Your account has been created successfully. Please wait for the House Owner to approve your join request to access the home controls.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 40),
               OutlinedButton.icon(
                 onPressed: () {
@@ -504,11 +772,19 @@ class DashboardScreen extends ConsumerWidget {
                   context.go('/login');
                 },
                 icon: const Icon(Icons.logout, color: Colors.redAccent),
-                label: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                label: const Text(
+                  'Logout',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
                   side: BorderSide(color: Colors.redAccent.shade100),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
