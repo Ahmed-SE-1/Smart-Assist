@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function profileAfter(uid) {
+      return getAfter(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function isHouseOwner(houseId) {
+      return signedIn()
+        && profile(request.auth.uid).data.role == 'owner'
+        && profile(request.auth.uid).data.houseId == houseId
+        && profile(request.auth.uid).data.isApproved == true
+        && profile(request.auth.uid).data.id == request.auth.uid;
+    }
+
+    function isHouseMember(houseId) {
+      return signedIn()
+        && profile(request.auth.uid).data.houseId == houseId
+        && profile(request.auth.uid).data.isApproved == true;
+    }
+
+    function validOwnerUserCreate(uid) {
+      return request.resource.data.id == uid
+        && request.resource.data.role == 'owner'
+        && request.resource.data.houseId == uid
+        && request.resource.data.isApproved == true
+        && request.resource.data.houseName is string
+        && request.resource.data.houseName.size() > 0
+        && request.resource.data.joinCode is string;
+    }
+
+    function validMemberUserCreate(uid) {
+      let ownerId = request.resource.data.houseId;
+      return request.resource.data.id == uid
+        && request.resource.data.role == 'member'
+        && request.resource.data.isApproved == false
+        && ownerId is string
+        && exists(/databases/$(database)/documents/users/$(ownerId))
+        && profile(ownerId).data.role == 'owner'
+        && profile(ownerId).data.houseId == ownerId
+        && request.resource.data.houseName == profile(ownerId).data.houseName;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (
+        request.auth.uid == uid
+        || (resource.data.houseId is string && isHouseOwner(resource.data.houseId))
+      );
+      allow list: if signedIn()
+        && isHouseOwner(resource.data.houseId)
+        && resource.data.houseId == profile(request.auth.uid).data.houseId;
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'id', 'name', 'email', 'avatarUrl', 'role', 'houseId', 'houseName',
+          'isApproved', 'joinCode'
+        ]) && (
+        validOwnerUserCreate(uid) || validMemberUserCreate(uid)
+      );
+
+      // The current app only edits display fields on the user's own profile.
+      // Owners can still approve/revoke a same-House member from Settings.
+      allow update: if signedIn() && (
+        (request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'email', 'avatarUrl']))
+        || (resource.data.role == 'member'
+          && isHouseOwner(resource.data.houseId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['isApproved'])
+          && request.resource.data.isApproved is bool)
+      );
+      allow delete: if false;
+    }
+
+    // Legacy signup checks these known IDs before Firebase Auth sign-in. Reads
+    // are get-only; writes are create-only and tied to an owner profile in the
+    // same atomic user/index batch. Migrate lookup to a callable before launch
+    // if anonymous six-digit-code enumeration is unacceptable.
+    match /joinCodes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('^[0-9]{6}$')
+        && request.resource.data.keys().hasOnly(['ownerId', 'houseName'])
+        && request.resource.data.ownerId == request.auth.uid
+        && profileAfter(request.auth.uid).data.role == 'owner'
+        && profileAfter(request.auth.uid).data.joinCode == code
+        && profileAfter(request.auth.uid).data.houseName == request.resource.data.houseName;
+      allow update, delete: if false;
+    }
+
+    match /houseNames/{nameKey} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerId'])
+        && request.resource.data.ownerId == request.auth.uid
+        && profileAfter(request.auth.uid).data.role == 'owner';
+      allow update, delete: if false;
+    }
+
+    match /houses/{houseId} {
+      allow get: if resource.data.houseId == houseId && isHouseMember(houseId);
+      allow list: if signedIn() && isHouseOwner(resource.data.houseId);
+
+      // Enables the explicit owner-only legacy registry backfill. Existing
+      // House documents cannot be overwritten; pairing fields stay null here.
+      allow create: if signedIn()
+        && request.auth.uid == houseId
+        && profile(request.auth.uid).data.role == 'owner'
+        && profile(request.auth.uid).data.houseId == houseId
+        && request.resource.data.keys().hasOnly([
+          'houseId', 'ownerUid', 'name', 'mainControllerId', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.houseId == houseId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name == profile(request.auth.uid).data.houseName
+        && request.resource.data.mainControllerId == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /controllers/{controllerId} {
+      allow get, list: if resource.data.activeHouseId is string
+        && isHouseMember(resource.data.activeHouseId);
+      allow create, update, delete: if false;
+    }
+
+    match /nodes/{nodeId} {
+      allow get, list: if resource.data.houseId is string
+        && isHouseMember(resource.data.houseId);
+      allow create, update, delete: if false;
+    }
+  }
+}
