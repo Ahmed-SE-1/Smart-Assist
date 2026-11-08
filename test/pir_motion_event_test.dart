@@ -9,8 +9,10 @@ import 'package:smart_home/core/mqtt_config.dart';
 import 'package:smart_home/models/device.dart';
 import 'package:smart_home/models/pir_motion_event.dart';
 import 'package:smart_home/models/room.dart';
+import 'package:smart_home/models/user.dart';
 import 'package:smart_home/providers/service_providers.dart';
 import 'package:smart_home/providers/smart_home_provider.dart';
+import 'package:smart_home/providers/user_provider.dart';
 import 'package:smart_home/screens/main_layout.dart';
 import 'package:smart_home/services/iot_simulation_service.dart';
 import 'package:smart_home/services/mqtt_service.dart';
@@ -276,10 +278,19 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      final success = await container
+      container.read(userProvider.notifier).setUser(
+        User(
+          id: 'owner',
+          name: 'Owner',
+          email: 'owner@example.com',
+          houseId: 'house-1',
+          isApproved: true,
+        ),
+      );
+      final toggleSuccess = await container
           .read(devicesProvider.notifier)
           .toggleDevice(room2Light);
-      expect(success, isTrue);
+      expect(toggleSuccess, isTrue);
       expect(byId('room2-light').isOn, isTrue);
       expect(mqtt.published, ['${Room.room2NodeId}:2:ON']);
       expect(container.read(pirNoticeProvider), isEmpty);

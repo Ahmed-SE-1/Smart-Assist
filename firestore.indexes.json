@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "controllerUnpairOperations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "nextDeliveryAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "controllerUnpairOperations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

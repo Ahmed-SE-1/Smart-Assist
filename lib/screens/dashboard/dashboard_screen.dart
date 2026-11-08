@@ -62,6 +62,8 @@ class DashboardScreen extends ConsumerWidget {
 
     // --- UPDATED: Naya filter wala provider use kiya (Access Control) ---
     final rooms = ref.watch(visibleRoomsProvider);
+    final roomSyncError = ref.watch(roomSyncErrorProvider);
+    final deviceSyncError = ref.watch(deviceSyncErrorProvider);
 
     // Yahan se unused devicesProvider remove kar diya hai
 
@@ -149,6 +151,14 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
+
+              if (roomSyncError != null || deviceSyncError != null) ...[
+                Text(
+                  roomSyncError ?? deviceSyncError!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // Stats Row
               Row(
@@ -322,6 +332,8 @@ class DashboardScreen extends ConsumerWidget {
     final controller = TextEditingController();
     String selectedIcon = 'living_room';
     String? selectedNode;
+    bool isSaving = false;
+    String? saveError;
 
     final Map<String, Map<String, dynamic>> roomTypes = {
       'living_room': {'label': 'Living Room', 'icon': Icons.chair_outlined},
@@ -365,6 +377,13 @@ class DashboardScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if (saveError != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              saveError!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           const Text(
                             'Select Room Type',
@@ -525,31 +544,51 @@ class DashboardScreen extends ConsumerWidget {
                   actionsPadding: const EdgeInsets.all(24),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
+                      onPressed:
+                          isSaving ? null : () => Navigator.pop(ctx),
                       child: Text(
                         'Cancel',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
-                        if (controller.text.trim().isEmpty) return;
+                      onPressed: isSaving ? null : () async {
+                        if (controller.text.trim().isEmpty) {
+                          setDialogState(
+                            () => saveError = 'Room name cannot be empty.',
+                          );
+                          return;
+                        }
+                        setDialogState(() {
+                          isSaving = true;
+                          saveError = null;
+                        });
 
                         final currentUser = ref.read(userProvider);
                         final creatorId = currentUser?.id ?? '';
                         final creatorName = currentUser?.name ?? 'Unknown';
-
-                        final error = ref
-                            .read(roomsProvider.notifier)
-                            .addRoom(
-                              controller.text,
-                              selectedIcon,
-                              creatorId,
-                              creatorName,
-                              mqttNodeId: selectedNode,
-                            );
+                        String? error;
+                        try {
+                          error = await ref
+                              .read(roomsProvider.notifier)
+                              .addRoom(
+                                controller.text,
+                                selectedIcon,
+                                creatorId,
+                                creatorName,
+                                mqttNodeId: selectedNode,
+                              );
+                        } catch (exception) {
+                          error = 'Room could not be saved: $exception';
+                        } finally {
+                          if (ctx.mounted) {
+                            setDialogState(() => isSaving = false);
+                          }
+                        }
+                        if (!context.mounted || !ctx.mounted) return;
 
                         if (error != null) {
+                          setDialogState(() => saveError = error);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(error),
@@ -575,7 +614,16 @@ class DashboardScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Add Room'),
+                      child:
+                          isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Create Room'),
                     ),
                   ],
                 ),

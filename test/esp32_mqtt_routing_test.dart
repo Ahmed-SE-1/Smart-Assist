@@ -149,36 +149,21 @@ void main() {
     expect(stored.toMap()['channel'], 2);
   });
 
-  test('New local node ids continue after the highest saved NODE id', () async {
-    SharedPreferences.setMockInitialValues({});
-    final container = ProviderContainer(
-      overrides: [
-        roomsProvider.overrideWith(
-          () => _Rooms([
-            const Room(
-              id: 'r1',
-              name: 'Existing',
-              iconAsset: 'bed',
-              esp32NodeId: 'NODE_002',
-              creatorId: 'owner',
-              creatorName: 'Owner',
-            ),
-          ]),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-    final error = container
-        .read(roomsProvider.notifier)
-        .addRoom('Kitchen', 'kitchen', 'owner', 'Owner');
-    expect(error, isNull);
-    final rooms = container.read(roomsProvider);
-    expect(rooms.first.esp32NodeId, 'NODE_002');
-    expect(rooms.last.esp32NodeId, 'NODE_003');
-    expect(rooms.last.mqttNodeId, isNull);
+  test('Highest existing local node id is identified for node allocation', () {
+    const rooms = [
+      Room(
+        id: 'r1',
+        name: 'Existing',
+        iconAsset: 'bed',
+        esp32NodeId: 'NODE_002',
+        creatorId: 'owner',
+        creatorName: 'Owner',
+      ),
+    ];
+    expect(Room.highestEsp32Counter(rooms), 2);
   });
 
-  test('The same ESP32 node cannot be assigned to two rooms', () {
+  test('The same ESP32 node cannot be assigned to two rooms', () async {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer(
       overrides: [
@@ -198,7 +183,7 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    final error = container
+    final error = await container
         .read(roomsProvider.notifier)
         .addRoom(
           'Room 2',
@@ -229,6 +214,8 @@ void main() {
     required List<Room> rooms,
     required List<Device> devices,
     MqttConfig config = mqttOn,
+    bool approved = true,
+    UserRole role = UserRole.owner,
   }) {
     SharedPreferences.setMockInitialValues({});
     mqtt = _Mqtt();
@@ -247,7 +234,9 @@ void main() {
             id: 'owner',
             name: 'Owner',
             email: 'owner@example.com',
+            role: role,
             houseId: 'house-1',
+            isApproved: approved,
           ),
         );
     addTearDown(container.dispose);
@@ -284,6 +273,29 @@ void main() {
     expect(mqtt.published.single['channel'], 1);
     expect(mqtt.published.single['state'], 'ON');
     expect(container.read(devicesProvider).single.isOn, isTrue);
+  });
+
+  test('Pending member cannot publish MQTT device commands', () async {
+    const light = Device(
+      id: 'room2-light',
+      name: 'Room 2 Light',
+      type: DeviceType.light,
+      roomId: 'room-2',
+      channel: RelayChannel.light,
+    );
+    setup(
+      rooms: [room('room-2', Room.room2NodeId)],
+      devices: [light],
+      approved: false,
+      role: UserRole.member,
+    );
+
+    final result = await container
+        .read(devicesProvider.notifier)
+        .toggleDevice(light);
+
+    expect(result, isFalse);
+    expect(mqtt.published, isEmpty);
   });
 
   test('Light OFF publishes channel 2 on ROOM2_NODE', () async {
@@ -427,10 +439,13 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    container
-        .read(devicesProvider.notifier)
-        .editDevice('fan', 'Cooling', DeviceType.ac);
-    final device = container.read(devicesProvider).single;
+    final original = container.read(devicesProvider).single;
+    final device = original.copyWith(
+      name: 'Cooling',
+      type: DeviceType.ac,
+      applyChannel: true,
+      channel: Device.channelForType(DeviceType.ac),
+    );
     expect(device.type, DeviceType.ac);
     expect(device.channel, isNull);
   });

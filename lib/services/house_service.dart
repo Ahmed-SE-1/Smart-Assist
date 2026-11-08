@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import '../models/house.dart';
 import '../models/user.dart' as app;
 
-enum HouseMigrationDisposition { planned, created, alreadyExists, rejected }
+enum HouseMigrationDisposition { planned, created, alreadyExists, conflict, rejected }
 
 class HouseMigrationIssue {
   const HouseMigrationIssue({required this.profileId, required this.reason});
@@ -17,11 +17,13 @@ class HouseMigrationPlan {
   const HouseMigrationPlan({
     required this.housesToCreate,
     required this.existingHouseIds,
+    required this.conflicts,
     required this.issues,
   });
 
   final List<House> housesToCreate;
   final List<String> existingHouseIds;
+  final List<HouseMigrationIssue> conflicts;
   final List<HouseMigrationIssue> issues;
 }
 
@@ -40,6 +42,7 @@ class LegacyHouseMigrationPlanner {
   static HouseMigrationPlan plan({
     required Iterable<LegacyHouseOwnerProfile> profiles,
     required Set<String> existingHouseIds,
+    Map<String, Map<String, dynamic>> existingHouses = const {},
     required DateTime timestamp,
   }) {
     final owners = profiles
@@ -47,6 +50,7 @@ class LegacyHouseMigrationPlanner {
         .toList();
     final issues = <HouseMigrationIssue>[];
     final existing = <String>[];
+    final conflicts = <HouseMigrationIssue>[];
     final validOwners = <({String uid, String name})>[];
     final seenProfileIds = <String>{};
     final duplicateProfileIds = <String>{};
@@ -107,7 +111,17 @@ class LegacyHouseMigrationPlanner {
       if (duplicateProfileIds.contains(owner.uid)) continue;
       if (duplicateNameIds.contains(owner.uid)) continue;
       if (existingHouseIds.contains(owner.uid)) {
-        existing.add(owner.uid);
+        final document = existingHouses[owner.uid];
+        if (document != null && _houseDocumentMatches(document, owner.uid, owner.name)) {
+          existing.add(owner.uid);
+        } else {
+          conflicts.add(HouseMigrationIssue(
+            profileId: owner.uid,
+            reason: document == null
+                ? 'Existing House document could not be verified.'
+                : 'Existing House document conflicts with the legacy owner profile.',
+          ));
+        }
         continue;
       }
       candidates.add(House(
@@ -123,6 +137,7 @@ class LegacyHouseMigrationPlanner {
     return HouseMigrationPlan(
       housesToCreate: candidates,
       existingHouseIds: existing,
+      conflicts: conflicts,
       issues: issues,
     );
   }
@@ -206,9 +221,19 @@ class HouseService {
 
     final existing = await houseRef.get();
     if (existing.exists) {
+      final data = existing.data();
+      final matches = data != null && _houseDocumentMatches(
+        data,
+        uid,
+        (profile!['houseName'] as String).trim(),
+      );
       return CurrentHouseMigrationResult(
-        disposition: HouseMigrationDisposition.alreadyExists,
-        message: 'Existing House registry document was left unchanged.',
+        disposition: matches
+            ? HouseMigrationDisposition.alreadyExists
+            : HouseMigrationDisposition.conflict,
+        message: matches
+            ? 'Matching House registry document was left unchanged.'
+            : 'Existing House document conflicts with the owner profile and was left unchanged.',
       );
     }
 
@@ -237,7 +262,16 @@ class HouseService {
         return HouseMigrationDisposition.rejected;
       }
       final latestHouse = await transaction.get(houseRef);
-      if (latestHouse.exists) return HouseMigrationDisposition.alreadyExists;
+      if (latestHouse.exists) {
+        final latestData = latestHouse.data();
+        return latestData != null && _houseDocumentMatches(
+              latestData,
+              uid,
+              (latestProfile!['houseName'] as String).trim(),
+            )
+            ? HouseMigrationDisposition.alreadyExists
+            : HouseMigrationDisposition.conflict;
+      }
       transaction.set(houseRef, {
         ...house.toMap(),
         'createdAt': FieldValue.serverTimestamp(),
@@ -253,6 +287,8 @@ class HouseService {
           ? 'House registry document created.'
           : disposition == HouseMigrationDisposition.rejected
               ? 'Owner profile changed or became inconsistent; no House was created.'
+              : disposition == HouseMigrationDisposition.conflict
+                  ? 'Existing House document conflicts with the owner profile and was left unchanged.'
               : 'House registry document already exists and was left unchanged.',
     );
   }
@@ -271,4 +307,14 @@ class HouseService {
     }
     return null;
   }
+
 }
+
+bool _houseDocumentMatches(
+  Map<String, dynamic> data,
+  String houseId,
+  String name,
+) =>
+    data['houseId'] == houseId &&
+    data['ownerUid'] == houseId &&
+    data['name'] == name;

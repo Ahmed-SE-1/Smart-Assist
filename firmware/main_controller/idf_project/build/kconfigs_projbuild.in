@@ -1,0 +1,7 @@
+source "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/bootloader/Kconfig.projbuild"
+source "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esp_app_format/Kconfig.projbuild"
+source "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esp_rom/Kconfig.projbuild"
+source "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esptool_py/Kconfig.projbuild"
+source "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/Kconfig.projbuild"
+source "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/Kconfig.projbuild"
+source "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__esp_rainmaker/Kconfig.projbuild"

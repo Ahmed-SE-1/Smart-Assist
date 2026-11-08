@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate-complete.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-download.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-install.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-mkdir.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-test.rule"
+		},
+		{
+			"file" : "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"pubsubclient-populate"
+		],
+		"name" : "pubsubclient-populate"
+	}
+}

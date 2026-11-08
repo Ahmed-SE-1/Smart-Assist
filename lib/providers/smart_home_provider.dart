@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,6 +20,28 @@ import 'service_providers.dart';
 
 const _uuid = Uuid();
 
+final roomSyncErrorProvider = StateProvider<String?>((ref) => null);
+final deviceSyncErrorProvider = StateProvider<String?>((ref) => null);
+
+Map<String, dynamic> _sharedDeviceData(Device device) => {
+  'id': device.id,
+  'name': device.name,
+  'type': device.type.name,
+  'roomId': device.roomId,
+  'sensorType': device.sensorType,
+  'channel': device.channel,
+};
+
+String _firestoreWriteError(String recordType, FirebaseException error) {
+  if (error.code == 'permission-denied') {
+    return '$recordType was not saved: Firestore denied access. Check your House approval and Room permissions.';
+  }
+  final detail = error.message;
+  return detail == null || detail.isEmpty
+      ? '$recordType could not be saved (${error.code}). Please try again.'
+      : '$recordType could not be saved: $detail';
+}
+
 // ═══════════════════════════════════════════
 // ROOM STATE MANAGEMENT
 // ═══════════════════════════════════════════
@@ -24,32 +49,74 @@ const _uuid = Uuid();
 /// Manages the list of Rooms (e.g., Bedroom, Kitchen) created by the user.
 class RoomsNotifier extends Notifier<List<Room>> {
   int _nodeCounter = 0;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  String? _activeHouseId;
+  int _listenerGeneration = 0;
+  final Map<String, Room> _confirmedRoomWrites = {};
 
   // --- UPGRADED: House-Specific Storage Key ---
-  String getStorageKey() {
+  String getStorageKey({String? houseId}) {
     final user = ref.read(userProvider);
     // Agar user logged in hai, toh uske houseId ke hisaab se key banegi
-    return 'shared_house_rooms_db_${user?.houseId ?? 'default'}';
+    return 'shared_house_rooms_db_${houseId ?? user?.houseId ?? 'default'}';
   }
 
   @override
   List<Room> build() {
     // ref.watch lagane se jab bhi user login/logout hoga, ye provider reload hoga
-    ref.watch(userProvider);
-    Future.microtask(_loadRooms);
-    return [];
-  }
-
-  Future<void> _loadRooms() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(getStorageKey());
-    if (data != null) {
-      final List decoded = jsonDecode(data);
-      state = decoded.map((e) => Room.fromMap(e)).toList();
-      _nodeCounter = Room.highestEsp32Counter(state);
+    _subscription?.cancel();
+    final user = ref.watch(userProvider);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final houseId =
+        user?.isApproved == true && user?.id == uid
+            ? user?.houseId?.trim()
+            : null;
+    final listenerGeneration = ++_listenerGeneration;
+    if (_activeHouseId != houseId) _confirmedRoomWrites.clear();
+    _activeHouseId = houseId;
+    ref.read(roomSyncErrorProvider.notifier).state = null;
+    if (houseId != null && houseId.isNotEmpty) {
+      _subscription = FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('rooms')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            (snapshot) {
+              if (_activeHouseId != houseId ||
+                  _listenerGeneration != listenerGeneration) {
+                return;
+              }
+              ref.read(roomSyncErrorProvider.notifier).state = null;
+              final roomsById = {
+                for (final doc in snapshot.docs.where(
+                  (doc) => !doc.metadata.hasPendingWrites,
+                ))
+                  doc.id: Room.fromMap({...doc.data(), 'id': doc.id}),
+              };
+              _confirmedRoomWrites.removeWhere(
+                (roomId, _) => roomsById.containsKey(roomId),
+              );
+              for (final entry in _confirmedRoomWrites.entries) {
+                roomsById.putIfAbsent(entry.key, () => entry.value);
+              }
+              state = roomsById.values.toList();
+              _nodeCounter = Room.highestEsp32Counter(state);
+              unawaited(_saveRooms(houseId: houseId).catchError((_) {}));
+            },
+            onError: (Object error, StackTrace stack) {
+              if (_activeHouseId == houseId &&
+                  _listenerGeneration == listenerGeneration) {
+                ref.read(roomSyncErrorProvider.notifier).state =
+                    'Rooms could not be synchronized. Check your connection and House access.';
+              }
+            },
+          );
     } else {
       state = [];
     }
+    ref.onDispose(() => _subscription?.cancel());
+    return [];
   }
 
   String? _normalizedMqttNodeId(String? mqttNodeId) {
@@ -73,19 +140,171 @@ class RoomsNotifier extends Notifier<List<Room>> {
     return null;
   }
 
-  Future<void> _saveRooms() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _saveRooms({String? houseId}) async {
     final encoded = jsonEncode(state.map((r) => r.toMap()).toList());
-    await prefs.setString(getStorageKey(), encoded);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(getStorageKey(houseId: houseId), encoded);
   }
 
-  String? addRoom(
+  /// Owner-triggered, create-only migration for the legacy House-scoped cache.
+  Future<String> migrateLocalHouseData() async {
+    final user = ref.read(userProvider);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final houseId = user?.houseId?.trim();
+    if (user == null ||
+        user.role != UserRole.owner ||
+        !user.isApproved ||
+        uid == null ||
+        user.id != uid ||
+        houseId == null ||
+        houseId.isEmpty) {
+      return 'Only the signed-in, approved House owner can migrate local data.';
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final roomJson = prefs.getString('shared_house_rooms_db_$houseId');
+      final deviceJson = prefs.getString('shared_house_devices_db_$houseId');
+      final rooms =
+          roomJson == null
+              ? <Room>[]
+              : (jsonDecode(roomJson) as List)
+                  .map(
+                    (row) =>
+                        Room.fromMap(Map<String, dynamic>.from(row as Map)),
+                  )
+                  .toList();
+      final devices =
+          deviceJson == null
+              ? <Device>[]
+              : (jsonDecode(deviceJson) as List)
+                  .map(
+                    (row) =>
+                        Device.fromMap(Map<String, dynamic>.from(row as Map)),
+                  )
+                  .toList();
+      if (rooms.isEmpty && devices.isEmpty)
+        return 'No local Rooms or Devices need migration.';
+      if (rooms.any((room) => room.id.isEmpty || room.creatorId != uid) ||
+          rooms.map((room) => room.id).toSet().length != rooms.length) {
+        return 'Migration stopped: local Rooms are not uniquely attributable to this House owner.';
+      }
+      final roomIds = rooms.map((room) => room.id).toSet();
+      if (devices.any((device) => device.id.isEmpty || device.roomId.isEmpty) ||
+          devices.map((device) => device.id).toSet().length != devices.length) {
+        return 'Migration stopped: a local Device has an invalid or ambiguous Room relationship.';
+      }
+
+      final houseRef = FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId);
+      final houseSnapshot = await houseRef.get();
+      final houseData = houseSnapshot.data();
+      if (!houseSnapshot.exists ||
+          houseData?['houseId'] != houseId ||
+          houseData?['ownerUid'] != uid) {
+        return 'Migration stopped: the signed-in owner could not verify this House record.';
+      }
+      for (final device in devices.where(
+        (item) => !roomIds.contains(item.roomId),
+      )) {
+        if (!(await houseRef.collection('rooms').doc(device.roomId).get())
+            .exists) {
+          return 'Migration stopped: Device ${device.id} refers to a Room that cannot be verified in this House.';
+        }
+      }
+
+      final roomRefs = {
+        for (final room in rooms)
+          room.id: houseRef.collection('rooms').doc(room.id),
+      };
+      final deviceRefs = {
+        for (final device in devices)
+          device.id: houseRef.collection('devices').doc(device.id),
+      };
+      final existingRooms = <String, Map<String, dynamic>>{};
+      final existingDevices = <String, Map<String, dynamic>>{};
+      for (final room in rooms) {
+        final snapshot = await roomRefs[room.id]!.get();
+        if (snapshot.exists) existingRooms[room.id] = snapshot.data()!;
+      }
+      for (final device in devices) {
+        final snapshot = await deviceRefs[device.id]!.get();
+        if (snapshot.exists) existingDevices[device.id] = snapshot.data()!;
+      }
+      for (final room in rooms) {
+        final existing = existingRooms[room.id];
+        if (existing != null &&
+            room.toMap().entries.any(
+              (entry) => existing[entry.key] != entry.value,
+            )) {
+          return 'Migration stopped: cloud Room ${room.id} already exists with different data.';
+        }
+      }
+      for (final device in devices) {
+        final existing = existingDevices[device.id];
+        final expected = _sharedDeviceData(device);
+        if (existing != null &&
+            expected.entries.any(
+              (entry) => existing[entry.key] != entry.value,
+            )) {
+          return 'Migration stopped: cloud Device ${device.id} already exists with different data.';
+        }
+      }
+
+      for (final room in rooms.where(
+        (item) => !existingRooms.containsKey(item.id),
+      )) {
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final snapshot = await transaction.get(roomRefs[room.id]!);
+          if (snapshot.exists) {
+            final data = snapshot.data()!;
+            if (room.toMap().entries.any(
+              (entry) => data[entry.key] != entry.value,
+            )) {
+              throw StateError('Room ${room.id} changed during migration.');
+            }
+          } else {
+            transaction.set(roomRefs[room.id]!, room.toMap());
+          }
+        });
+      }
+      for (final device in devices.where(
+        (item) => !existingDevices.containsKey(item.id),
+      )) {
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final reference = deviceRefs[device.id]!;
+          final snapshot = await transaction.get(reference);
+          final expected = _sharedDeviceData(device);
+          if (snapshot.exists) {
+            final data = snapshot.data()!;
+            if (expected.entries.any(
+              (entry) => data[entry.key] != entry.value,
+            )) {
+              throw StateError('Device ${device.id} changed during migration.');
+            }
+          } else {
+            transaction.set(reference, expected);
+          }
+        });
+      }
+      for (final reference in [...roomRefs.values, ...deviceRefs.values]) {
+        if (!(await reference.get()).exists)
+          return 'Migration could not verify every cloud record; local data was retained.';
+      }
+      return 'Migration complete: ${rooms.length} Rooms and ${devices.length} Devices verified. Local data was retained.';
+    } catch (_) {
+      return 'Migration failed before verification. Local data was retained; retry after resolving Firestore access.';
+    }
+  }
+
+  Future<String?> addRoom(
     String name,
     String iconAsset,
     String creatorId,
     String creatorName, {
     String? mqttNodeId,
-  }) {
+  }) async {
     if (name.trim().isEmpty) return 'Room name cannot be empty';
     if (state.length >= 5) return 'Maximum 5 rooms allowed';
 
@@ -112,17 +331,47 @@ class RoomsNotifier extends Notifier<List<Room>> {
       creatorName: creatorName,
     );
 
-    state = [...state, room];
-    _saveRooms();
+    final houseId = ref.read(userProvider)?.houseId?.trim();
+    if (houseId == null ||
+        houseId.isEmpty ||
+        ref.read(userProvider)?.isApproved != true ||
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+      return 'An approved House member is required.';
+    if (creatorId != FirebaseAuth.instance.currentUser?.uid) {
+      return 'The Room creator must be the signed-in House member.';
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('rooms')
+          .doc(room.id)
+          .set(room.toMap());
+    } on FirebaseException catch (error) {
+      return _firestoreWriteError('Room', error);
+    } catch (error) {
+      return 'Room could not be saved to the House. $error';
+    }
+    if (_activeHouseId != houseId) return null;
+    _confirmedRoomWrites[room.id] = room;
+    if (!state.any((existing) => existing.id == room.id)) {
+      state = [...state, room];
+    }
+    try {
+      await _saveRooms(houseId: houseId);
+    } catch (_) {
+      // Firestore is authoritative; a local cache failure cannot undo the
+      // completed cloud write or make the dialog report that it failed.
+    }
     return null;
   }
 
-  String? editRoom(
+  Future<String?> editRoom(
     String id,
     String name,
     String iconAsset, {
     String? mqttNodeId,
-  }) {
+  }) async {
     if (name.trim().isEmpty) return 'Room name cannot be empty';
 
     if (state.any(
@@ -135,6 +384,31 @@ class RoomsNotifier extends Notifier<List<Room>> {
     final nodeError = _mqttNodeError(mqttNodeId, exceptRoomId: id);
     if (nodeError != null) return nodeError;
 
+    final roomMatches = state.where((r) => r.id == id);
+    final existing = roomMatches.isEmpty ? null : roomMatches.first;
+    if (existing == null) return 'Room no longer exists.';
+    final updated = existing.copyWith(
+      name: name.trim(),
+      iconAsset: iconAsset,
+      mqttNodeId: _normalizedMqttNodeId(mqttNodeId),
+    );
+    final houseId = ref.read(userProvider)?.houseId?.trim();
+    if (houseId == null ||
+        houseId.isEmpty ||
+        ref.read(userProvider)?.isApproved != true ||
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+      return 'An approved House member is required.';
+    try {
+      await FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('rooms')
+          .doc(id)
+          .update(updated.toMap());
+    } catch (_) {
+      return 'Room could not be updated in the House. Please try again.';
+    }
+    if (_activeHouseId != houseId) return null;
     state =
         state.map((r) {
           if (r.id == id) {
@@ -146,14 +420,55 @@ class RoomsNotifier extends Notifier<List<Room>> {
           }
           return r;
         }).toList();
-    _saveRooms();
+    _saveRooms(houseId: houseId);
     return null;
   }
 
-  void removeRoom(String roomId) {
+  Future<String?> removeRoom(String roomId) async {
+    final user = ref.read(userProvider);
+    final houseId = user?.houseId?.trim();
+    if (houseId == null ||
+        houseId.isEmpty ||
+        user?.isApproved != true ||
+        user?.id != FirebaseAuth.instance.currentUser?.uid) {
+      return 'An approved House member is required.';
+    }
+    final house = FirebaseFirestore.instance.collection('houses').doc(houseId);
+    try {
+      final roomRef = house.collection('rooms').doc(roomId);
+      final roomSnapshot = await roomRef.get();
+      if (!roomSnapshot.exists) return 'Room no longer exists.';
+      final room = Room.fromMap({
+        ...roomSnapshot.data()!,
+        'id': roomSnapshot.id,
+      });
+      if (user!.role != UserRole.owner && room.creatorId != user.id) {
+        return 'You can delete only rooms you created.';
+      }
+      if (roomSnapshot.data()?['deletionInProgress'] != true) {
+        await roomRef.update({'deletionInProgress': true});
+      }
+      final devices =
+          await house
+              .collection('devices')
+              .where('roomId', isEqualTo: roomId)
+              .get();
+      for (var offset = 0; offset < devices.docs.length; offset += 450) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (final device in devices.docs.skip(offset).take(450)) {
+          batch.delete(device.reference);
+        }
+        await batch.commit();
+      }
+      await roomRef.delete();
+    } catch (_) {
+      return 'Room could not be completely deleted. Please retry.';
+    }
+    if (_activeHouseId != houseId) return null;
     state = state.where((r) => r.id != roomId).toList();
-    _saveRooms();
+    _saveRooms(houseId: houseId);
     ref.read(devicesProvider.notifier).removeDevicesInRoom(roomId);
+    return null;
   }
 }
 
@@ -168,11 +483,7 @@ final visibleRoomsProvider = Provider<List<Room>>((ref) {
 
   if (user == null) return [];
 
-  if (user.role == UserRole.owner) {
-    return allRooms;
-  } else {
-    return allRooms.where((room) => room.creatorId == user.id).toList();
-  }
+  return user.isApproved ? allRooms : [];
 });
 
 // ═══════════════════════════════════════════
@@ -209,17 +520,78 @@ class AllDevicesOffResult {
 
 class DevicesNotifier extends Notifier<List<Device>> {
   Timer? _sensorTimer;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  String? _activeHouseId;
+  int _listenerGeneration = 0;
+  final Map<String, Device> _confirmedDeviceWrites = {};
 
   // --- UPGRADED: House-Specific Storage Key ---
-  String getStorageKey() {
+  String getStorageKey({String? houseId}) {
     final user = ref.read(userProvider);
-    return 'shared_house_devices_db_${user?.houseId ?? 'default'}';
+    return 'shared_house_devices_db_${houseId ?? user?.houseId ?? 'default'}';
   }
 
   @override
   List<Device> build() {
-    ref.watch(userProvider); // User switch hone par devices reload hongi
-    Future.microtask(_loadDevices);
+    _subscription?.cancel();
+    final user = ref.watch(userProvider);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final houseId =
+        user?.isApproved == true && user?.id == uid
+            ? user?.houseId?.trim()
+            : null;
+    final listenerGeneration = ++_listenerGeneration;
+    if (_activeHouseId != houseId) _confirmedDeviceWrites.clear();
+    _activeHouseId = houseId;
+    ref.read(deviceSyncErrorProvider.notifier).state = null;
+    if (houseId != null && houseId.isNotEmpty) {
+      _subscription = FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('devices')
+          .snapshots(includeMetadataChanges: true)
+          .listen(
+            (snapshot) {
+              if (_activeHouseId != houseId ||
+                  _listenerGeneration != listenerGeneration) {
+                return;
+              }
+              ref.read(deviceSyncErrorProvider.notifier).state = null;
+              final live = {for (final d in state) d.id: d};
+              final devicesById = <String, Device>{};
+              for (final doc in snapshot.docs.where(
+                (doc) => !doc.metadata.hasPendingWrites,
+              )) {
+                    final cloud = Device.fromMap({...doc.data(), 'id': doc.id});
+                    final previous = live[cloud.id];
+                    devicesById[cloud.id] = cloud.copyWith(
+                      isOn: previous?.isOn ?? false,
+                      fanSpeed: previous?.fanSpeed ?? 0,
+                      acTemperature: previous?.acTemperature ?? 24,
+                      sensorValue: previous?.sensorValue ?? 0.0,
+                    );
+              }
+              _confirmedDeviceWrites.removeWhere(
+                (deviceId, _) => devicesById.containsKey(deviceId),
+              );
+              for (final entry in _confirmedDeviceWrites.entries) {
+                devicesById.putIfAbsent(entry.key, () => entry.value);
+              }
+              state = devicesById.values.toList();
+              unawaited(_saveDevices(houseId: houseId).catchError((_) {}));
+            },
+            onError: (Object error, StackTrace stack) {
+              if (_activeHouseId == houseId &&
+                  _listenerGeneration == listenerGeneration) {
+                ref.read(deviceSyncErrorProvider.notifier).state =
+                    'Devices could not be synchronized. Check your connection and House access.';
+              }
+            },
+          );
+    } else {
+      state = [];
+    }
+    ref.onDispose(() => _subscription?.cancel());
     _startSensorSimulation();
     ref.onDispose(() {
       _sensorTimer?.cancel();
@@ -227,21 +599,10 @@ class DevicesNotifier extends Notifier<List<Device>> {
     return [];
   }
 
-  Future<void> _loadDevices() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString(getStorageKey());
-    if (data != null) {
-      final List decoded = jsonDecode(data);
-      state = decoded.map((e) => Device.fromMap(e)).toList();
-    } else {
-      state = [];
-    }
-  }
-
-  Future<void> _saveDevices() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _saveDevices({String? houseId}) async {
     final encoded = jsonEncode(state.map((d) => d.toMap()).toList());
-    await prefs.setString(getStorageKey(), encoded);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(getStorageKey(houseId: houseId), encoded);
   }
 
   void _startSensorSimulation() {
@@ -275,7 +636,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
     });
   }
 
-  String? addDevice(String name, DeviceType type, String roomId) {
+  Future<String?> addDevice(String name, DeviceType type, String roomId) async {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
     final sensorType =
@@ -290,14 +651,84 @@ class DevicesNotifier extends Notifier<List<Device>> {
       channel: Device.channelForType(type),
     );
 
-    state = [...state, device];
-    _saveDevices();
+    final user = ref.read(userProvider);
+    final houseId = user?.houseId?.trim();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (houseId == null ||
+        houseId.isEmpty ||
+        user?.isApproved != true ||
+        user?.id != uid ||
+        uid == null)
+      return 'An approved House member is required.';
+    final roomMatches = ref
+        .read(roomsProvider)
+        .where((room) => room.id == roomId);
+    if (roomMatches.isEmpty)
+      return 'Choose a Room in the selected House.';
+    final room = roomMatches.first;
+    if (user!.role != UserRole.owner && room.creatorId != uid) {
+      return 'Members can add Devices only to Rooms they created.';
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('devices')
+          .doc(device.id)
+          .set(_sharedDeviceData(device));
+    } on FirebaseException catch (error) {
+      return _firestoreWriteError('Device', error);
+    } catch (error) {
+      return 'Device could not be saved to the House. $error';
+    }
+    if (_activeHouseId != houseId) return null;
+    _confirmedDeviceWrites[device.id] = device;
+    if (!state.any((existing) => existing.id == device.id)) {
+      state = [...state, device];
+    }
+    try {
+      await _saveDevices(houseId: houseId);
+    } catch (_) {
+      // Keep the cloud-confirmed Device visible if local caching fails.
+    }
     return null;
   }
 
-  String? editDevice(String id, String name, DeviceType type) {
+  Future<String?> editDevice(String id, String name, DeviceType type) async {
     if (name.trim().isEmpty) return 'Device name cannot be empty';
 
+    final deviceMatches = state.where((d) => d.id == id);
+    final old = deviceMatches.isEmpty ? null : deviceMatches.first;
+    if (old == null) return 'Device no longer exists.';
+    final updated = old.copyWith(
+      name: name.trim(),
+      type: type,
+      applyChannel: true,
+      channel: Device.channelForType(type),
+    );
+    final houseId = ref.read(userProvider)?.houseId?.trim();
+    if (houseId == null ||
+        houseId.isEmpty ||
+        ref.read(userProvider)?.isApproved != true ||
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+      return 'An approved House member is required.';
+    try {
+      await FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('devices')
+          .doc(id)
+          .update({
+            ..._sharedDeviceData(updated),
+            'isOn': FieldValue.delete(),
+            'fanSpeed': FieldValue.delete(),
+            'acTemperature': FieldValue.delete(),
+            'sensorValue': FieldValue.delete(),
+          });
+    } catch (_) {
+      return 'Device could not be updated in the House. Please try again.';
+    }
+    if (_activeHouseId != houseId) return null;
     state =
         state.map((d) {
           if (d.id == id) {
@@ -310,14 +741,43 @@ class DevicesNotifier extends Notifier<List<Device>> {
           }
           return d;
         }).toList();
-    _saveDevices();
+    _saveDevices(houseId: houseId);
     return null;
   }
 
-  void removeDevice(String deviceId) {
+  Future<String?> removeDevice(String deviceId) async {
+    final user = ref.read(userProvider);
+    final houseId = user?.houseId?.trim();
+    if (houseId == null ||
+        houseId.isEmpty ||
+        user?.isApproved != true ||
+        user?.id != FirebaseAuth.instance.currentUser?.uid)
+      return 'An approved House member is required.';
+    final matching = state.where((device) => device.id == deviceId);
+    if (matching.isEmpty) return 'Device no longer exists.';
+    final device = matching.first;
+    final roomMatches = ref
+        .read(roomsProvider)
+        .where((room) => room.id == device.roomId);
+    if (user!.role != UserRole.owner &&
+        (roomMatches.isEmpty || roomMatches.first.creatorId != user.id)) {
+      return 'You can delete devices only in rooms you created.';
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('devices')
+          .doc(deviceId)
+          .delete();
+    } catch (_) {
+      return 'Device could not be deleted. Please try again.';
+    }
+    if (_activeHouseId != houseId) return null;
     state = state.where((d) => d.id != deviceId).toList();
-    _saveDevices();
+    _saveDevices(houseId: houseId);
     ref.read(automationProvider.notifier).removeRulesForDevice(deviceId);
+    return null;
   }
 
   void removeDevicesInRoom(String roomId) {
@@ -364,6 +824,15 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }) async {
     final mqtt = ref.read(mqttServiceProvider);
     final config = ref.read(mqttConfigProvider);
+    final user = ref.read(userProvider);
+    if (config.enabled && (user == null || !user.isApproved)) {
+      return _failed(
+        device,
+        action,
+        method,
+        'House owner approval is required before controlling devices.',
+      );
+    }
     final isOnOff = action == 'ON' || action == 'OFF';
     final isRelay = Device.isRelayType(device.type);
 
@@ -721,9 +1190,10 @@ final pirNoticeProvider =
 /// Listens on the shared MQTT client while a house is signed in.
 final mqttEventBridgeProvider = Provider<void>((ref) {
   final config = ref.watch(mqttConfigProvider);
-  final houseId = ref.watch(userProvider)?.houseId?.trim() ?? '';
+  final user = ref.watch(userProvider);
+  final houseId = user?.houseId?.trim() ?? '';
   final mqtt = ref.watch(mqttServiceProvider);
-  if (!config.enabled || houseId.isEmpty) return;
+  if (!config.enabled || user?.isApproved != true || houseId.isEmpty) return;
 
   final subscription = mqtt.motionEvents.listen((event) {
     ref.read(devicesProvider.notifier).applyPirMotionEvent(event);

@@ -11,6 +11,11 @@ class ControllerRegistryEntry {
     this.status = 'unknown',
     this.pairedAt,
     this.lastSeenAt,
+    this.firebaseAuthUid,
+    this.authCredentialGeneration,
+    this.authCredentialStatus,
+    this.authCredentialIssuedAt,
+    this.authCredentialRevokedAt,
   });
 
   final String controllerId;
@@ -18,6 +23,12 @@ class ControllerRegistryEntry {
   final String status;
   final DateTime? pairedAt;
   final DateTime? lastSeenAt;
+  /// Firebase Auth identity reference only; the credential itself is never stored here.
+  final String? firebaseAuthUid;
+  final int? authCredentialGeneration;
+  final String? authCredentialStatus;
+  final DateTime? authCredentialIssuedAt;
+  final DateTime? authCredentialRevokedAt;
 
   Map<String, dynamic> toMap() => {
     'controllerId': controllerId,
@@ -25,6 +36,11 @@ class ControllerRegistryEntry {
     'status': status,
     'pairedAt': _timestamp(pairedAt),
     'lastSeenAt': _timestamp(lastSeenAt),
+    'firebaseAuthUid': firebaseAuthUid,
+    'authCredentialGeneration': authCredentialGeneration,
+    'authCredentialStatus': authCredentialStatus,
+    'authCredentialIssuedAt': _timestamp(authCredentialIssuedAt),
+    'authCredentialRevokedAt': _timestamp(authCredentialRevokedAt),
   };
 
   factory ControllerRegistryEntry.fromMap(
@@ -37,6 +53,13 @@ class ControllerRegistryEntry {
       status: map['status'] is String ? map['status'] as String : 'unknown',
       pairedAt: _readDateTime(map['pairedAt']),
       lastSeenAt: _readDateTime(map['lastSeenAt']),
+      firebaseAuthUid: _optionalString(map['firebaseAuthUid']),
+      authCredentialGeneration: map['authCredentialGeneration'] is int
+          ? map['authCredentialGeneration'] as int
+          : null,
+      authCredentialStatus: _optionalString(map['authCredentialStatus']),
+      authCredentialIssuedAt: _readDateTime(map['authCredentialIssuedAt']),
+      authCredentialRevokedAt: _readDateTime(map['authCredentialRevokedAt']),
     );
   }
 

@@ -108,12 +108,52 @@ void main() {
         ),
       ],
       existingHouseIds: const {'owner-uid'},
+      existingHouses: const {
+        'owner-uid': {
+          'houseId': 'owner-uid',
+          'ownerUid': 'owner-uid',
+          'name': 'Home',
+          'mainControllerId': null,
+        },
+      },
       timestamp: now,
     );
 
     expect(plan.housesToCreate, isEmpty);
     expect(plan.existingHouseIds, ['owner-uid']);
     expect(plan.issues, isEmpty);
+    expect(plan.conflicts, isEmpty);
+  });
+
+  test('Conflicting existing House document is reported and never overwritten', () {
+    final plan = LegacyHouseMigrationPlanner.plan(
+      profiles: [
+        const LegacyHouseOwnerProfile(
+          documentId: 'owner-uid',
+          data: {
+            'id': 'owner-uid',
+            'houseId': 'owner-uid',
+            'houseName': 'Home',
+            'role': 'owner',
+          },
+        ),
+      ],
+      existingHouseIds: const {'owner-uid'},
+      existingHouses: const {
+        'owner-uid': {
+          'houseId': 'owner-uid',
+          'ownerUid': 'someone-else',
+          'name': 'Other House',
+          'mainControllerId': null,
+        },
+      },
+      timestamp: now,
+    );
+
+    expect(plan.housesToCreate, isEmpty);
+    expect(plan.existingHouseIds, isEmpty);
+    expect(plan.conflicts, hasLength(1));
+    expect(plan.conflicts.single.profileId, 'owner-uid');
   });
 
   test('Duplicate and inconsistent legacy owner profiles are reported', () {

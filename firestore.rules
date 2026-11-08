@@ -9,44 +9,41 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid));
     }
 
-    function profileAfter(uid) {
-      return getAfter(/databases/$(database)/documents/users/$(uid));
+    function hasProfile(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
     }
 
     function isHouseOwner(houseId) {
       return signedIn()
+        && hasProfile(request.auth.uid)
+        && profile(request.auth.uid).data.id == request.auth.uid
         && profile(request.auth.uid).data.role == 'owner'
-        && profile(request.auth.uid).data.houseId == houseId
-        && profile(request.auth.uid).data.isApproved == true
-        && profile(request.auth.uid).data.id == request.auth.uid;
-    }
-
-    function isHouseMember(houseId) {
-      return signedIn()
         && profile(request.auth.uid).data.houseId == houseId
         && profile(request.auth.uid).data.isApproved == true;
     }
 
-    function validOwnerUserCreate(uid) {
-      return request.resource.data.id == uid
-        && request.resource.data.role == 'owner'
-        && request.resource.data.houseId == uid
-        && request.resource.data.isApproved == true
-        && request.resource.data.houseName is string
-        && request.resource.data.houseName.size() > 0
-        && request.resource.data.joinCode is string;
+    function isHouseMember(houseId) {
+      return signedIn()
+        && hasProfile(request.auth.uid)
+        && profile(request.auth.uid).data.id == request.auth.uid
+        && profile(request.auth.uid).data.houseId == houseId
+        && profile(request.auth.uid).data.role in ['owner', 'member']
+        && profile(request.auth.uid).data.isApproved == true;
     }
 
-    function validMemberUserCreate(uid) {
-      let ownerId = request.resource.data.houseId;
-      return request.resource.data.id == uid
-        && request.resource.data.role == 'member'
-        && request.resource.data.isApproved == false
-        && ownerId is string
-        && exists(/databases/$(database)/documents/users/$(ownerId))
-        && profile(ownerId).data.role == 'owner'
-        && profile(ownerId).data.houseId == ownerId
-        && request.resource.data.houseName == profile(ownerId).data.houseName;
+    function ownsRoom(houseId, roomId) {
+      return exists(/databases/$(database)/documents/houses/$(houseId)/rooms/$(roomId))
+        && get(/databases/$(database)/documents/houses/$(houseId)/rooms/$(roomId)).data.creatorId == request.auth.uid;
+    }
+
+    function canManageRoom(houseId, roomId) {
+      return isHouseOwner(houseId)
+        || (isHouseMember(houseId) && ownsRoom(houseId, roomId));
+    }
+
+    function roomIsActive(houseId, roomId) {
+      return exists(/databases/$(database)/documents/houses/$(houseId)/rooms/$(roomId))
+        && get(/databases/$(database)/documents/houses/$(houseId)/rooms/$(roomId)).data.get('deletionInProgress', false) != true;
     }
 
     match /users/{uid} {
@@ -58,14 +55,8 @@ service cloud.firestore {
         && isHouseOwner(resource.data.houseId)
         && resource.data.houseId == profile(request.auth.uid).data.houseId;
 
-      allow create: if signedIn()
-        && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly([
-          'id', 'name', 'email', 'avatarUrl', 'role', 'houseId', 'houseName',
-          'isApproved', 'joinCode'
-        ]) && (
-        validOwnerUserCreate(uid) || validMemberUserCreate(uid)
-      );
+      // Profile creation and privileged profile fields are Functions-only.
+      allow create: if false;
 
       // The current app only edits display fields on the user's own profile.
       // Owners can still approve/revoke a same-House member from Settings.
@@ -82,31 +73,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Legacy signup checks these known IDs before Firebase Auth sign-in. Reads
-    // are get-only; writes are create-only and tied to an owner profile in the
-    // same atomic user/index batch. Migrate lookup to a callable before launch
-    // if anonymous six-digit-code enumeration is unacceptable.
+    // Signup and index repair now run through authenticated trusted Functions.
     match /joinCodes/{code} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if signedIn()
-        && code.matches('^[0-9]{6}$')
-        && request.resource.data.keys().hasOnly(['ownerId', 'houseName'])
-        && request.resource.data.ownerId == request.auth.uid
-        && profileAfter(request.auth.uid).data.role == 'owner'
-        && profileAfter(request.auth.uid).data.joinCode == code
-        && profileAfter(request.auth.uid).data.houseName == request.resource.data.houseName;
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     match /houseNames/{nameKey} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['ownerId'])
-        && request.resource.data.ownerId == request.auth.uid
-        && profileAfter(request.auth.uid).data.role == 'owner';
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     match /houses/{houseId} {
@@ -129,12 +102,108 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update, delete: if false;
+
+      match /rooms/{roomId} {
+        allow get, list: if isHouseMember(houseId);
+        allow create: if isHouseMember(houseId)
+          && request.resource.data.id == roomId
+          && request.resource.data.creatorId == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.iconAsset is string
+          && request.resource.data.esp32NodeId is string
+          && (request.resource.data.mqttNodeId == null || request.resource.data.mqttNodeId in ['ROOM1_NODE', 'ROOM2_NODE'])
+          && request.resource.data.creatorName is string
+          && request.resource.data.keys().hasOnly([
+            'id', 'name', 'iconAsset', 'esp32NodeId', 'mqttNodeId', 'creatorId', 'creatorName'
+          ]);
+        allow update: if canManageRoom(houseId, roomId)
+          && resource.data.get('deletionInProgress', false) != true
+          && request.resource.data.get('deletionInProgress', false) != true
+          && request.resource.data.id == roomId
+          && request.resource.data.creatorId == resource.data.creatorId
+          && request.resource.data.keys().hasOnly([
+            'id', 'name', 'iconAsset', 'esp32NodeId', 'mqttNodeId', 'creatorId', 'creatorName'
+          ])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.iconAsset is string
+          && request.resource.data.esp32NodeId is string
+          && (request.resource.data.mqttNodeId == null || request.resource.data.mqttNodeId in ['ROOM1_NODE', 'ROOM2_NODE'])
+          && request.resource.data.creatorName is string;
+        allow update: if canManageRoom(houseId, roomId)
+          && resource.data.get('deletionInProgress', false) != true
+          && request.resource.data.get('deletionInProgress', false) == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionInProgress']);
+        allow delete: if canManageRoom(houseId, roomId)
+          && resource.data.get('deletionInProgress', false) == true;
+      }
+
+      match /devices/{deviceId} {
+        allow get, list: if isHouseMember(houseId);
+        allow create: if isHouseMember(houseId)
+          && request.resource.data.id == deviceId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.type in ['light', 'fan', 'ac', 'sensor']
+          && request.resource.data.roomId is string
+          && request.resource.data.sensorType is string
+          && (request.resource.data.channel == null || request.resource.data.channel is int)
+          && ((request.resource.data.type == 'fan' && request.resource.data.channel == 1)
+            || (request.resource.data.type == 'light' && request.resource.data.channel == 2)
+            || (request.resource.data.type in ['ac', 'sensor'] && request.resource.data.channel == null))
+          && request.resource.data.keys().hasOnly([
+            'id', 'name', 'type', 'roomId', 'sensorType', 'channel'
+          ])
+          && roomIsActive(houseId, request.resource.data.roomId)
+          && canManageRoom(houseId, request.resource.data.roomId);
+        allow update: if isHouseMember(houseId)
+          && request.resource.data.id == deviceId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.type in ['light', 'fan', 'ac', 'sensor']
+          && request.resource.data.roomId is string
+          && request.resource.data.sensorType is string
+          && (request.resource.data.channel == null || request.resource.data.channel is int)
+          && ((request.resource.data.type == 'fan' && request.resource.data.channel == 1)
+            || (request.resource.data.type == 'light' && request.resource.data.channel == 2)
+            || (request.resource.data.type in ['ac', 'sensor'] && request.resource.data.channel == null))
+          && request.resource.data.keys().hasOnly([
+            'id', 'name', 'type', 'roomId', 'sensorType', 'channel'
+          ])
+          && roomIsActive(houseId, request.resource.data.roomId)
+          && canManageRoom(houseId, request.resource.data.roomId)
+          && canManageRoom(houseId, resource.data.roomId);
+        allow delete: if isHouseMember(houseId)
+          && canManageRoom(houseId, resource.data.roomId);
+      }
     }
 
     match /controllers/{controllerId} {
       allow get, list: if resource.data.activeHouseId is string
         && isHouseMember(resource.data.activeHouseId);
       allow create, update, delete: if false;
+    }
+
+    // Pairing session hashes and claims are accessible only to trusted Functions.
+    match /pairingSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Identity migration tokens are hash-keyed and server-only, like pairing tokens.
+    match /controllerIdentityMigrationSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Owners may reconcile only the unpair operations they requested. All
+    // operation creation, state transitions, and device acknowledgements are
+    // trusted Functions writes.
+    match /controllerUnpairOperations/{operationId} {
+      allow get: if signedIn()
+        && resource.data.requestedBy == request.auth.uid
+        && resource.data.houseId is string
+        && isHouseOwner(resource.data.houseId);
+      allow list, create, update, delete: if false;
     }
 
     match /nodes/{nodeId} {

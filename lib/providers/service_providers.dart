@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../core/mqtt_config.dart';
 import '../services/auto_detect_speech_service.dart';
 import '../services/mqtt_service.dart';
 import '../services/nlp_api_service.dart';
+import '../services/registration_service.dart';
+import '../services/main_controller_pairing_service.dart';
 
 final mqttConfigProvider = Provider<MqttConfig>((ref) => const MqttConfig());
 
@@ -12,6 +15,21 @@ final mqttServiceProvider = Provider<MqttService>((ref) {
   // connection error when the diagnostic mode is disabled or unconfigured.
   ref.onDispose(() => service.dispose());
   return service;
+});
+
+final registrationServiceProvider = Provider<HouseRegistrationService>((ref) {
+  return HouseRegistrationService(FirebaseCallableInvoker());
+});
+
+final controllerPairingServiceProvider = Provider<ControllerPairingService>((
+  ref,
+) {
+  final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+  return ControllerPairingService(
+    callable: FirebaseCallableInvoker(functions: functions),
+    ble: FlutterReactiveMainControllerBleAdapter(),
+    registry: FirestoreControllerRegistryReader(),
+  );
 });
 
 /// The bilingual (English + Urdu) intent classifier backend.
@@ -29,7 +47,9 @@ final nlpApiServiceProvider = Provider<NlpApiService>((ref) {
 /// live microphone. The per-user "remembered language" key is passed in at call
 /// time via `userScope` instead of being baked into the provider.
 /// Thresholds live in [SpeechDetectConfig].
-final autoDetectSpeechServiceProvider = Provider<AutoDetectSpeechService>((ref) {
+final autoDetectSpeechServiceProvider = Provider<AutoDetectSpeechService>((
+  ref,
+) {
   final service = AutoDetectSpeechService();
   ref.onDispose(() => service.dispose());
   return service;

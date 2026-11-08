@@ -9,6 +9,7 @@ import '../screens/splash_screen.dart';
 import '../screens/rooms/room_detail_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/auth/pending_approval_screen.dart';
 import '../screens/auth/role_selection_screen.dart'; // Role Selection Screen Import
 
 import '../screens/main_layout.dart';
@@ -16,6 +17,7 @@ import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/features/automation/automation_screen.dart';
 import '../screens/alerts/alerts_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/settings/main_controller_pairing_screen.dart';
 import '../screens/features/gesture/gesture_screen.dart';
 import '../screens/features/voice/voice_screen.dart';
 
@@ -43,9 +45,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuth = authState.isAuthenticated;
 
       // UPDATED: Added /role-selection to auth routes
-      final isGoingToAuth = state.matchedLocation == '/login' ||
+      final isGoingToAuth =
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/role-selection';
+      final isPendingRoute = state.matchedLocation == '/pending-approval';
 
       final isSplash = state.matchedLocation == '/';
 
@@ -55,6 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       // LOGIC FOR AUTHENTICATED USERS:
       else {
+        if (authState.isPendingApproval) {
+          if (!isPendingRoute) return '/pending-approval';
+          return null;
+        }
+        if (isPendingRoute) return '/home';
         if (isGoingToAuth || isSplash) {
           return '/home';
         }
@@ -64,14 +73,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // --- UNPROTECTED / SETUP ROUTES ---
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
 
       // NEW: Role Selection Route
       GoRoute(
@@ -85,9 +88,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           // Extra se data nikal kar cast kar rahe hain.
           // Agar direct URL hit hota hai toh fallback default member set kardiya.
-          final role = state.extra is UserRole ? state.extra as UserRole : UserRole.member;
+          final role =
+              state.extra is UserRole
+                  ? state.extra as UserRole
+                  : UserRole.member;
           return RegisterScreen(selectedRole: role);
         },
+      ),
+      GoRoute(
+        path: '/pending-approval',
+        builder: (context, state) => const PendingApprovalScreen(),
       ),
 
       // --- PROTECTED ROUTES (Require Login) ---
@@ -95,18 +105,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
           GoRoute(
-              path: '/home',
-              builder: (context, state) => const DashboardScreen(),
-              routes: [
-                GoRoute(
-                  path: 'gesture',
-                  builder: (context, state) => const GestureScreen(),
-                ),
-                GoRoute(
-                  path: 'voice',
-                  builder: (context, state) => const VoiceScreen(),
-                ),
-              ]
+            path: '/home',
+            builder: (context, state) => const DashboardScreen(),
+            routes: [
+              GoRoute(
+                path: 'gesture',
+                builder: (context, state) => const GestureScreen(),
+              ),
+              GoRoute(
+                path: 'voice',
+                builder: (context, state) => const VoiceScreen(),
+              ),
+            ],
           ),
           GoRoute(
             path: '/automation',
@@ -118,11 +128,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/room/:name',
-            builder: (context, state) => RoomDetailScreen(roomName: state.pathParameters['name'] ?? 'Room'),
+            builder:
+                (context, state) => RoomDetailScreen(
+                  roomName: state.pathParameters['name'] ?? 'Room',
+                ),
           ),
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+            routes: [
+              GoRoute(
+                path: 'controller-pairing',
+                builder:
+                    (context, state) => const MainControllerPairingScreen(),
+              ),
+            ],
           ),
         ],
       ),

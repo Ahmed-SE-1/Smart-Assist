@@ -47,5 +47,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Gesture Control uses the camera to recognize hand gestures for smart home control.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>SmartAssist uses Bluetooth to connect your Main Controller during setup.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>SmartAssist uses Bluetooth to connect your Main Controller during setup.</string>
 </dict>
 </plist>

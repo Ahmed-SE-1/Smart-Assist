@@ -1,0 +1,15 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=git
+command=C:/Users/LAPTOPS LOUNGE/.espressif/tools/cmake/3.24.0/bin/cmake.exe;-P;D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/tmp/pubsubclient-populate-gitclone.cmake
+source_dir=D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-src
+work_dir=D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps
+repository=https://github.com/knolleary/pubsubclient.git
+remote=origin
+init_submodules=TRUE
+recurse_submodules=--recursive
+submodules=
+CMP0097=NEW
+

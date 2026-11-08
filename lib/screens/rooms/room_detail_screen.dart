@@ -20,11 +20,24 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final rooms = ref.watch(roomsProvider);
+    if (rooms.isEmpty) {
+      final syncError = ref.watch(roomSyncErrorProvider);
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back),
+          ),
+        ),
+        body: Center(child: Text(syncError ?? 'This House has no Rooms yet.')),
+      );
+    }
     final room = rooms.firstWhere(
       (r) => r.name == widget.roomName,
       orElse: () => rooms.first,
     );
     final devices = ref.watch(devicesByRoomProvider(room.id));
+    final deviceSyncError = ref.watch(deviceSyncErrorProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
@@ -53,8 +66,18 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   room.mqttNodeId,
                 );
               } else if (value == 'delete') {
-                ref.read(roomsProvider.notifier).removeRoom(room.id);
-                context.pop();
+                ref.read(roomsProvider.notifier).removeRoom(room.id).then((
+                  error,
+                ) {
+                  if (!context.mounted) return;
+                  if (error == null) {
+                    context.pop();
+                  } else {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(error)));
+                  }
+                });
               }
             },
             itemBuilder:
@@ -75,6 +98,22 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           children: [
+            if (deviceSyncError != null) ...[
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  deviceSyncError,
+                  style: TextStyle(color: Colors.red.shade800),
+                ),
+              ),
+            ],
             Text(
               widget.roomName,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -563,6 +602,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   void _showAddDeviceDialog(String roomId) {
     final controller = TextEditingController();
     DeviceType selectedType = DeviceType.light;
+    bool isSaving = false;
+    String? saveError;
 
     showDialog(
       context: context,
@@ -598,6 +639,13 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                               ),
                             ),
                           ),
+                          if (saveError != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              saveError!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           const Text(
                             'Select Device Type',
@@ -695,19 +743,45 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   actionsPadding: const EdgeInsets.all(24),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
+                      onPressed:
+                          isSaving ? null : () => Navigator.pop(ctx),
                       child: Text(
                         'Cancel',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
-                        if (controller.text.trim().isEmpty) return;
-                        final error = ref
-                            .read(devicesProvider.notifier)
-                            .addDevice(controller.text, selectedType, roomId);
+                      onPressed: isSaving ? null : () async {
+                        if (controller.text.trim().isEmpty) {
+                          setDialogState(
+                            () => saveError = 'Device name cannot be empty.',
+                          );
+                          return;
+                        }
+                        setDialogState(() {
+                          isSaving = true;
+                          saveError = null;
+                        });
+                        String? error;
+                        try {
+                          error = await ref
+                              .read(devicesProvider.notifier)
+                              .addDevice(
+                                controller.text,
+                                selectedType,
+                                roomId,
+                              );
+                        } catch (exception) {
+                          error = 'Device could not be saved: $exception';
+                        } finally {
+                          if (ctx.mounted) {
+                            setDialogState(() => isSaving = false);
+                          }
+                        }
+                        if (!mounted || !context.mounted || !ctx.mounted)
+                          return;
                         if (error != null) {
+                          setDialogState(() => saveError = error);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(error),
@@ -733,7 +807,16 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Add Device'),
+                      child:
+                          isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Create Device'),
                     ),
                   ],
                 ),
@@ -911,9 +994,9 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         if (controller.text.trim().isEmpty) return;
-                        final error = ref
+                        final error = await ref
                             .read(roomsProvider.notifier)
                             .editRoom(
                               roomId,
@@ -921,6 +1004,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                               selectedIcon,
                               mqttNodeId: selectedNode,
                             );
+                        if (!mounted || !context.mounted || !ctx.mounted)
+                          return;
                         if (error != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -960,7 +1045,15 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         if (value == 'edit') {
           _showEditDeviceDialog(device);
         } else if (value == 'delete') {
-          ref.read(devicesProvider.notifier).removeDevice(device.id);
+          ref.read(devicesProvider.notifier).removeDevice(device.id).then((
+            error,
+          ) {
+            if (error != null && mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(error)));
+            }
+          });
         }
       },
       itemBuilder:
@@ -1112,15 +1205,17 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         if (controller.text.trim().isEmpty) return;
-                        final error = ref
+                        final error = await ref
                             .read(devicesProvider.notifier)
                             .editDevice(
                               device.id,
                               controller.text,
                               selectedType,
                             );
+                        if (!mounted || !context.mounted || !ctx.mounted)
+                          return;
                         if (error != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
