@@ -1,0 +1,23 @@
+name = "smartassist-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-09"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "smartassist-18d2a"
+MAX_REQUEST_BYTES = "16384"
+ENVIRONMENT = "development"
+
+[env.production]
+name = "smartassist-api-production"
+workers_dev = true
+compatibility_flags = ["nodejs_compat"]
+
+[env.production.vars]
+FIREBASE_PROJECT_ID = "smartassist-18d2a"
+MAX_REQUEST_BYTES = "16384"
+ENVIRONMENT = "production"
+
+[triggers]
+crons = ["* * * * *"]

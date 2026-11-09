@@ -1,0 +1,116 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:7112
+load:0x40078000,len:15624
+load:0x40080400,len:4
+load:0x40080404,len:3876
+entry 0x4008064c
+[0;32mI (29) boot: ESP-IDF v5.1.4 2nd stage bootloader[0m
+[0;32mI (29) boot: compile time Nov  9 2026 19:00:44[0m
+[0;32mI (29) boot: Multicore bootloader[0m
+[0;32mI (34) boot: chip revision: v3.1[0m
+[0;32mI (37) boot.esp32: SPI Speed      : 40MHz[0m
+[0;32mI (42) boot.esp32: SPI Mode       : DIO[0m
+[0;32mI (47) boot.esp32: SPI Flash Size : 4MB[0m
+[0;32mI (51) boot: Enabling RNG early entropy source...[0m
+[0;32mI (57) boot: Partition Table:[0m
+[0;32mI (60) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (67) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (75) boot:  1 nvs_keys         NVS keys         01 04 0000f000 00001000[0m
+[0;32mI (82) boot:  2 factory          factory app      00 00 00020000 003e0000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (94) esp_image: segment 0: paddr=00020020 vaddr=3f400020 size=4453ch (279868) map[0m
+[0;32mI (204) esp_image: segment 1: paddr=00064564 vaddr=3ffbdb60 size=059c0h ( 22976) load[0m
+[0;32mI (213) esp_image: segment 2: paddr=00069f2c vaddr=40080000 size=060ech ( 24812) load[0m
+[0;32mI (223) esp_image: segment 3: paddr=00070020 vaddr=400d0020 size=1104b4h (1115316) map[0m
+[0;32mI (626) esp_image: segment 4: paddr=001804dc vaddr=400860ec size=17d00h ( 97536) load[0m
+[0;32mI (682) boot: Loaded app from partition at offset 0x20000[0m
+[0;32mI (682) boot: Disabling RNG early entropy source...[0m
+[0;32mI (694) cpu_start: Multicore app[0m
+[0;32mI (694) cpu_start: Pro cpu up.[0m
+[0;32mI (694) cpu_start: Starting app cpu, entry point is 0x400814ec[0m
+[0;32mI (0) cpu_start: App cpu up.[0m
+[0;32mI (714) cpu_start: Pro cpu start user code[0m
+[0;32mI (714) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (714) cpu_start: Application information:[0m
+[0;32mI (719) cpu_start: Project name:     smartassist_main_controller[0m
+[0;32mI (726) cpu_start: App version:      a049f30-dirty[0m
+[0;32mI (731) cpu_start: Compile time:     Nov  9 2026 21:27:19[0m
+[0;32mI (737) cpu_start: ELF file SHA256:  35b7e0cde4aaa8d5...[0m
+[0;32mI (743) cpu_start: ESP-IDF:          v5.1.4[0m
+[0;32mI (748) cpu_start: Min chip rev:     v0.0[0m
+[0;32mI (753) cpu_start: Max chip rev:     v3.99 [0m
+[0;32mI (758) cpu_start: Chip rev:         v3.1[0m
+[0;32mI (763) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (770) heap_init: At 3FFAFF10 len 000000F0 (0 KiB): DRAM[0m
+[0;32mI (776) heap_init: At 3FFB6388 len 00001C78 (7 KiB): DRAM[0m
+[0;32mI (782) heap_init: At 3FFB9A20 len 00004108 (16 KiB): DRAM[0m
+[0;32mI (788) heap_init: At 3FFCC510 len 00013AF0 (78 KiB): DRAM[0m
+[0;32mI (794) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[0;32mI (800) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[0;32mI (807) heap_init: At 4009DDEC len 00002214 (8 KiB): IRAM[0m
+[0;32mI (815) spi_flash: detected chip: generic[0m
+[0;32mI (818) spi_flash: flash io: dio[0m
+[0;32mI (823) coexist: coex firmware version: d96c1e51f[0m
+[0;32mI (828) app_start: Starting scheduler on CPU0[0m
+[0;32m[0;32mI (832) app_start: Starting scheduler on CPU1[0m
+[0;32mI (832) main_task: Started on CPU0[0m[0m
+[0;32mI (842) main_task: Calling app_main()[0m
+[0;33mW (882) smartassist-storage: DEVELOPMENT MODE: N5�I (893) wifi:wifi driver task: 3ffd4ad4, prio:23, stack:6656, core=0
+[0;32mI (912) wifi:wifi firmware version: 3ce09e5[0m
+[0;32mI (913) wifi:wifi certification version: v7.0[0m
+[0;32mI (913) wifi:config NVS flash: enabled[0m
+[0;32mI (913) wifi:config nano formating: disabled[0m
+[0;32mI (917) wifi:Init data frame dynamic rx buffer num: 32[0m
+[0;32mI (922) wifi:Init static rx mgmt buffer num: 5[0m
+[0;32mI (926) wifi:Init management short buffer num: 32[0m
+[0;32mI (930) wifi:Init dynamic tx buffer num: 32[0m
+[0;32mI (934) wifi:Init static rx buffer size: 1600[0m
+[0;32mI (938) wifi:Init static rx buffer num: 4[0m
+[0;32mI (942) wifi:Init dynamic rx buffer num: 32[0m
+[0;32mI (947) wifi_init: rx ba win: 6[0m
+[0;32mI (950) wifi_init: tcpip mbox: 32[0m
+[0;32mI (953) wifi_init: udp mbox: 6[0m
+[0;32mI (957) wifi_init: tcp mbox: 6[0m
+[0;32mI (961) wifi_init: tcp tx win: 5760[0m
+[0;32mI (965) wifi_init: tcp rx win: 5760[0m
+[0;32mI (969) wifi_init: tcp mss: 1440[0m
+[0;32mI (973) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (978) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (987) phy_init: phy_version 4791,2c4672b,Dec 20 2023,16:06:06[0m
+[0;32mI (1075) wifi:mode : sta (c8:85:41:c5:97:84)[0m
+[0;32mI (1077) wifi:enable tsf[0m
+[0;32mI (1084) wifi:Set ps type: 0, coexist: 0[0m
+
+WiFi connection attempt started.
+[   279][E][Preferences.cpp:506] getString(): nvs_get_str len fail: house_id NOT_FOUND
+[0;32mI (1101) wifi:new:<3,0>, old:<1,0>, ap:<255,255>, sta:<3,0>, prof:1[0m
+[0;32mI (1103) wifi:state: init -> auth (b0)[0m
+[0;32mI (1107) wifi:state: auth -> assoc (0)[0m
+[0;32mI (1113) wifi:state: assoc -> run (10)[0m
+[   308][E][Preferences.cpp:506] getString(): nvs_get_str len fail: controller_id NOT_FOUND
+[0;32mI (1130) BTDM_INIT: BT controller compile version [1175e0a][0m
+[0;32mI (1136) wifi:connected with OutsiderNotAllowed, aid = 42, channel 3, BW20, bssid = d0:ef:c1:d5:01:64[0m
+[0;32mI (1137) wifi:security: WPA2-PSK, phy: bgn, rssi: -36[0m
+[0;32mI (1145) wifi:pm start, type: 0[0m
+
+[0;32mI (1145) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us[0m
+[0;32mI (1153) BTDM_INIT: Bluetooth MAC: c8:85:41:c5:97:86[0m
+[0;32mI (1159) wifi:Coexist!!! Wi-Fi station would only keep waked when available[0m
+
+[0;32mI (1204) wifi:AP's beacon interval = 102400 us, DTIM period = 1[0m
+[0;33mW (1685) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+Main Controller BLE pairing service ready.
+[0;32mI (4157) esp_netif_handlers: sta ip: 192.168.100.232, mask: 255.255.255.0, gw: 192.168.100.1[0m
+WiFi connected.
+192.168.100.232
+WiFi channel: 3
+[0;32mI (4163) ESPNOW: espnow [version: 1.0] init[0m
+NODE 1 added successfully!
+NODE 2 added successfully!
+ESP-NOW READY!
+[0;32mI (9196) wifi:<ba-add>idx:0 (ifx:0, d0:ef:c1:d5:01:64), tid:0, ssn:11, winSize:64[0m

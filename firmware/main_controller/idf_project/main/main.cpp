@@ -6,6 +6,8 @@
 #include "freertos/task.h"
 #include <cstring>
 
+extern bool NVS_STORAGE_AVAILABLE;
+extern bool NVS_ENCRYPTION_AVAILABLE;
 extern bool PROTECTED_NVS_AVAILABLE;
 void setup();
 void loop();
@@ -55,15 +57,40 @@ bool initializeEncryptedNvs() {
   return true;
 #endif
 }
+
+bool initializeStorage() {
+#if CONFIG_SMARTASSIST_DEVELOPMENT_MODE
+  const esp_err_t result = nvs_flash_init();
+  if (result != ESP_OK) {
+    ESP_LOGE(TAG, "Development NVS initialization failed: %s; storage was not erased",
+             esp_err_to_name(result));
+    return false;
+  }
+  NVS_STORAGE_AVAILABLE = true;
+  NVS_ENCRYPTION_AVAILABLE = false;
+  PROTECTED_NVS_AVAILABLE = false;
+  ESP_LOGW(TAG, "DEVELOPMENT MODE: NVS storage is NOT encrypted; authentication secrets are RAM-only.");
+  return true;
+#elif CONFIG_SMARTASSIST_REQUIRE_ENCRYPTED_STORAGE
+  if (!initializeEncryptedNvs()) return false;
+  NVS_STORAGE_AVAILABLE = true;
+  NVS_ENCRYPTION_AVAILABLE = true;
+  PROTECTED_NVS_AVAILABLE = true;
+  ESP_LOGI(TAG, "Production encrypted storage verified.");
+  return true;
+#else
+  ESP_LOGE(TAG, "No explicit SmartAssist storage mode selected; refusing startup");
+  return false;
+#endif
+}
 }  // namespace
 
 extern "C" void app_main() {
-  if (!initializeEncryptedNvs()) {
+  if (!initializeStorage()) {
     ESP_LOGE(TAG, "Pairing and firmware startup halted; flash data was not erased");
     while (true) vTaskDelay(pdMS_TO_TICKS(1000));
   }
 
-  PROTECTED_NVS_AVAILABLE = true;
   initArduino();
   setup();
   while (true) {

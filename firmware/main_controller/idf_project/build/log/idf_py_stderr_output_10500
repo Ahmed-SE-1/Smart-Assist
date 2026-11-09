@@ -1,0 +1,14 @@
+--- WARNING: GDB cannot open serial ports accessed as COMx
+--- NOTE: Using \\.\COM10 instead...
+--- esp-idf-monitor 1.10.0 on \\.\COM10 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+--- ERROR: Connection to \\.\COM10 failed. Available ports:
+COM4
+COM7
+COM5
+COM6
+COM8
+COM9
+COM10
+COM3
+

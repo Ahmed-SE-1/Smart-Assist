@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/user.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/service_providers.dart';
 import '../../providers/user_provider.dart';
 import '../../services/main_controller_pairing_service.dart';
@@ -36,6 +37,7 @@ class _MainControllerPairingScreenState
   String? _progress;
   String? _message;
   bool _messageIsError = false;
+  String? _lastStatusErrorLog;
 
   @override
   void dispose() {
@@ -294,10 +296,24 @@ class _MainControllerPairingScreenState
     });
   }
 
+  String _safeFirebaseErrorMessage(String? message, User user) {
+    var safeMessage = message?.trim() ?? '';
+    if (safeMessage.isEmpty) safeMessage = 'No additional details.';
+    for (final privateValue in [user.id, user.name, user.email, user.houseId]) {
+      if (privateValue != null && privateValue.isNotEmpty) {
+        safeMessage = safeMessage.replaceAll(privateValue, '[redacted]');
+      }
+    }
+    return safeMessage
+        .replaceAll(RegExp(r'https?://\S+'), '[redacted URL]')
+        .replaceAll(RegExp(r'\b[A-Za-z0-9_-]{32,}\b'), '[redacted value]');
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userProvider);
-    if (!_canManage(user)) {
+    final isAuthenticated = ref.watch(firebaseAuthenticatedProvider);
+    if (!isAuthenticated || !_canManage(user)) {
       return Scaffold(
         appBar: AppBar(title: const Text('Main Controller')),
         body: const Center(
@@ -323,7 +339,31 @@ class _MainControllerPairingScreenState
       builder: (context, registrySnapshot) {
         final registryState = registrySnapshot.data;
         final paired = registryState?.isPaired == true;
-        final houseReady = registryState?.houseExists == true;
+        final pendingUnpair =
+            registryState?.unpairStatus == 'pending' ||
+            registryState?.unpairStatus == 'prepared' ||
+            registryState?.status == 'unpair_pending' ||
+            registryState?.status == 'unpair_prepared';
+        final confirmedMissingHouse =
+            registryState != null && !registryState.houseExists;
+        if (registrySnapshot.hasError) {
+          final error = registrySnapshot.error;
+          if (error is FirebaseException) {
+            final safeMessage = _safeFirebaseErrorMessage(error.message, user);
+            final signature = '${error.code}:$safeMessage';
+            if (_lastStatusErrorLog != signature) {
+              _lastStatusErrorLog = signature;
+              debugPrint(
+                'Main Controller status stream Firebase error '
+                '(code: ${error.code}, message: $safeMessage)',
+              );
+            }
+          }
+        } else {
+          _lastStatusErrorLog = null;
+        }
+        final pairingBlockedByRegistry =
+            paired || pendingUnpair || confirmedMissingHouse;
         return Scaffold(
           appBar: AppBar(title: const Text('Main Controller')),
           body: ListView(
@@ -371,8 +411,7 @@ class _MainControllerPairingScreenState
                             _scanning ||
                             _pairing ||
                             _unpairing ||
-                            paired ||
-                            !houseReady)
+                            pairingBlockedByRegistry)
                         ? null
                         : () => _startPairing(user),
                 icon:

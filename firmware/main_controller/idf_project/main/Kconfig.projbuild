@@ -1,0 +1,26 @@
+menu "SmartAssist security"
+
+config SMARTASSIST_DEVELOPMENT_MODE
+    bool "Enable SmartAssist Development Mode"
+    default n
+    help
+        Allows ordinary, unencrypted NVS for non-secret development metadata.
+        Authentication and recovery credentials are RAM-only.
+
+config SMARTASSIST_REQUIRE_ENCRYPTED_STORAGE
+    bool "Require encrypted NVS (production)"
+    depends on !SMARTASSIST_DEVELOPMENT_MODE
+    default y
+    help
+        Production startup requires the encrypted NVS initialization path.
+        This option does not configure Flash Encryption or modify eFuses.
+
+config SMARTASSIST_WORKER_BASE_URL
+    string "SmartAssist Worker HTTPS base URL"
+    default ""
+    help
+        Set to the verified deployed Worker origin, for example
+        https://<verified-worker-host>.workers.dev. Leave empty until the
+        actual Cloudflare account and workers.dev hostname are configured.
+
+endmenu

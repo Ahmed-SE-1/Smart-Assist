@@ -8,7 +8,7 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/user.dart';
-import 'registration_service.dart';
+import 'main_controller_worker_client.dart';
 
 /// Stable GATT contract shared with the future Main ESP32 firmware.
 abstract final class MainControllerBleProtocol {
@@ -447,14 +447,14 @@ class _FlutterReactiveMainControllerBleConnection
 
 class ControllerPairingService {
   ControllerPairingService({
-    required CallableInvoker callable,
+    required MainControllerApi api,
     required MainControllerBleAdapter ble,
     required ControllerRegistryReader registry,
-  }) : _callable = callable,
+  }) : _api = api,
        _ble = ble,
        _registry = registry;
 
-  final CallableInvoker _callable;
+  final MainControllerApi _api;
   final MainControllerBleAdapter _ble;
   final ControllerRegistryReader _registry;
   Completer<void>? _pairingCancellation;
@@ -476,9 +476,9 @@ class ControllerPairingService {
 
   Future<MainControllerPairingSession> createPairingSession(User user) async {
     final houseId = _approvedOwnerHouseId(user);
-    final response = await _callable.call('createControllerPairingSession', {
-      'houseId': houseId,
-    });
+    final response = await _apiCall(
+      () => _api.post('/v1/controller/pairing-sessions', {'houseId': houseId}),
+    );
     final token = response['token'];
     final expiry = response['expiresAt'];
     if (token is! String ||
@@ -550,7 +550,7 @@ class ControllerPairingService {
       final remaining = session.expiresAt.difference(DateTime.now());
       final waitForResult =
           remaining < resultTimeout ? remaining : resultTimeout;
-      onProgress?.call('Waiting for Firebase pairing confirmation…');
+      onProgress?.call('Waiting for controller claim confirmation…');
       final responseFuture = connection.pairingResults.first.timeout(
         waitForResult,
       );
@@ -579,7 +579,7 @@ class ControllerPairingService {
               'smartassist-controller-${confirmation.controllerId}') {
         throw const MainControllerPairingException(
           'registry-not-confirmed',
-          'Firebase has not confirmed the controller identity and assignment yet.',
+          'The service has not confirmed the controller identity and assignment yet.',
         );
       }
       return confirmation;
@@ -602,16 +602,18 @@ class ControllerPairingService {
     String controllerId,
   ) async {
     final houseId = _approvedOwnerHouseId(user);
-    final response = await _callable.call('requestMainControllerUnpair', {
-      'houseId': houseId,
-      'controllerId': controllerId,
-    });
+    final response = await _apiCall(
+      () => _api.post('/v1/controller/unpair-operations', {
+        'houseId': houseId,
+        'controllerId': controllerId,
+      }),
+    );
     final operation = MainControllerUnpairOperation.fromMap(response);
     if (operation.houseId != houseId ||
         operation.controllerId != controllerId) {
       throw const MainControllerPairingException(
         'unpair-operation-mismatch',
-        'Firebase returned an operation for another controller.',
+        'The service returned an operation for another controller.',
       );
     }
     return operation;
@@ -622,14 +624,15 @@ class ControllerPairingService {
     String operationId,
   ) async {
     final houseId = _approvedOwnerHouseId(user);
-    final response = await _callable.call('getMainControllerUnpairOperation', {
-      'operationId': operationId,
-    });
+    final safeOperationId = Uri.encodeComponent(operationId);
+    final response = await _apiCall(
+      () => _api.get('/v1/controller/unpair-operations/$safeOperationId'),
+    );
     final operation = MainControllerUnpairOperation.fromMap(response);
     if (operation.houseId != houseId || operation.operationId != operationId) {
       throw const MainControllerPairingException(
         'unpair-operation-mismatch',
-        'Firebase returned an operation for another House.',
+        'The service returned an operation for another House.',
       );
     }
     return operation;
@@ -639,11 +642,32 @@ class ControllerPairingService {
     User user,
     String operationId,
   ) async {
-    _approvedOwnerHouseId(user);
-    final response = await _callable.call('retryMainControllerUnpair', {
-      'operationId': operationId,
-    });
-    return MainControllerUnpairOperation.fromMap(response);
+    final houseId = _approvedOwnerHouseId(user);
+    final safeOperationId = Uri.encodeComponent(operationId);
+    final response = await _apiCall(
+      () => _api.post(
+        '/v1/controller/unpair-operations/$safeOperationId/retry',
+        const {},
+      ),
+    );
+    final operation = MainControllerUnpairOperation.fromMap(response);
+    if (operation.houseId != houseId || operation.operationId != operationId) {
+      throw const MainControllerPairingException(
+        'unpair-operation-mismatch',
+        'The service returned an operation for another House.',
+      );
+    }
+    return operation;
+  }
+
+  Future<Map<String, dynamic>> _apiCall(
+    Future<Map<String, dynamic>> Function() request,
+  ) async {
+    try {
+      return await request();
+    } on WorkerApiException catch (error) {
+      throw MainControllerPairingException(error.code, error.message);
+    }
   }
 
   String _approvedOwnerHouseId(User user) {

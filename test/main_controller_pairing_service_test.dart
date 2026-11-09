@@ -1,40 +1,57 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_home/models/user.dart';
+import 'package:smart_home/providers/auth_provider.dart';
 import 'package:smart_home/providers/service_providers.dart';
 import 'package:smart_home/providers/user_provider.dart';
 import 'package:smart_home/screens/settings/main_controller_pairing_screen.dart';
 import 'package:smart_home/services/main_controller_pairing_service.dart';
-import 'package:smart_home/services/registration_service.dart';
+import 'package:smart_home/services/main_controller_worker_client.dart';
 
-class _FakeCallable implements CallableInvoker {
+class _FakeControllerApi implements MainControllerApi {
   final calls = <({String name, Map<String, dynamic> payload})>[];
   Map<String, dynamic> sessionResponse = {
     'token': List.filled(43, 'a').join(),
     'expiresAt':
         DateTime.now().add(const Duration(minutes: 5)).toIso8601String(),
   };
+  Object? sessionError;
   Map<String, dynamic> unpairResponse = const {};
   Map<String, dynamic> unpairStatusResponse = const {};
 
   @override
-  Future<Map<String, dynamic>> call(
-    String functionName,
+  Future<Map<String, dynamic>> post(
+    String path,
     Map<String, dynamic> payload,
   ) async {
+    final functionName = switch (path) {
+      '/v1/controller/pairing-sessions' => 'createControllerPairingSession',
+      '/v1/controller/unpair-operations' => 'requestMainControllerUnpair',
+      _ when path.endsWith('/retry') => 'retryMainControllerUnpair',
+      _ => 'unknown',
+    };
     calls.add((name: functionName, payload: payload));
-    if (functionName == 'createControllerPairingSession')
+    if (functionName == 'createControllerPairingSession') {
+      if (sessionError case final error?) throw error;
       return sessionResponse;
+    }
     if (functionName == 'requestMainControllerUnpair') return unpairResponse;
-    if (functionName == 'getMainControllerUnpairOperation') {
+    if (functionName == 'retryMainControllerUnpair') return unpairResponse;
+    fail('Unexpected Worker route $path');
+  }
+
+  @override
+  Future<Map<String, dynamic>> get(String path) async {
+    calls.add((name: 'getMainControllerUnpairOperation', payload: const {}));
+    if (path.startsWith('/v1/controller/unpair-operations/')) {
       return unpairStatusResponse;
     }
-    if (functionName == 'retryMainControllerUnpair') return unpairResponse;
-    fail('Unexpected callable $functionName');
+    fail('Unexpected Worker route $path');
   }
 }
 
@@ -42,11 +59,15 @@ class _FakeRegistry implements ControllerRegistryReader {
   final houseData = <String, Map<String, dynamic>?>{};
   final controllerData = <String, Map<String, dynamic>?>{};
   final states = <String, ControllerRegistryState>{};
+  Object? watchError;
 
   @override
-  Stream<ControllerRegistryState> watchHouse(String houseId) => Stream.value(
-    states[houseId] ?? const ControllerRegistryState(houseExists: true),
-  );
+  Stream<ControllerRegistryState> watchHouse(String houseId) {
+    if (watchError case final error?) return Stream.error(error);
+    return Stream.value(
+      states[houseId] ?? const ControllerRegistryState(houseExists: true),
+    );
+  }
 
   @override
   Future<Map<String, dynamic>?> getHouse(String houseId) async =>
@@ -62,9 +83,13 @@ class _FakeBleAdapter implements MainControllerBleAdapter {
   MainControllerBleConnection? connection;
   Object? connectionError;
   int connectCalls = 0;
+  int scanCalls = 0;
 
   @override
-  Stream<MainControllerBleDevice> scanForControllers() => scanResults.stream;
+  Stream<MainControllerBleDevice> scanForControllers() {
+    scanCalls++;
+    return scanResults.stream;
+  }
 
   @override
   Future<MainControllerBleConnection> connect(
@@ -107,17 +132,17 @@ class _FakeBleConnection implements MainControllerBleConnection {
 
 class _Harness {
   _Harness()
-    : callable = _FakeCallable(),
+    : callable = _FakeControllerApi(),
       ble = _FakeBleAdapter(),
       registry = _FakeRegistry() {
     service = ControllerPairingService(
-      callable: callable,
+      api: callable,
       ble: ble,
       registry: registry,
     );
   }
 
-  final _FakeCallable callable;
+  final _FakeControllerApi callable;
   final _FakeBleAdapter ble;
   final _FakeRegistry registry;
   late final ControllerPairingService service;
@@ -146,6 +171,29 @@ const _device = MainControllerBleDevice(
   rssi: -45,
 );
 const _controllerId = 'CTRL_abcdefgh1234';
+
+Future<void> _pumpPairingScreen(
+  WidgetTester tester,
+  _Harness harness, {
+  required User? user,
+  bool authenticated = true,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      key: UniqueKey(),
+      overrides: [
+        controllerPairingServiceProvider.overrideWithValue(harness.service),
+        userProvider.overrideWith(() => _FixedUserNotifier(user)),
+        firebaseAuthenticatedProvider.overrideWithValue(authenticated),
+      ],
+      child: const MaterialApp(home: MainControllerPairingScreen()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+FilledButton _startPairingButton(WidgetTester tester) => tester
+    .widget<FilledButton>(find.widgetWithText(FilledButton, 'Start pairing'));
 
 void _respond(
   _FakeBleConnection connection, {
@@ -249,28 +297,37 @@ void main() {
     },
   );
 
-  test('pairing does not report success until Firebase identity provisioning is active', () async {
-    final harness = _Harness();
-    final connection = _FakeBleConnection();
-    _respond(connection, ok: true);
-    harness.ble.connection = connection;
-    harness.registry.houseData['owner-1'] = {'mainControllerId': _controllerId};
-    harness.registry.controllerData[_controllerId] = {'activeHouseId': 'owner-1'};
-    final session = await harness.service.createPairingSession(_owner);
+  test(
+    'pairing does not report success until Firebase identity provisioning is active',
+    () async {
+      final harness = _Harness();
+      final connection = _FakeBleConnection();
+      _respond(connection, ok: true);
+      harness.ble.connection = connection;
+      harness.registry.houseData['owner-1'] = {
+        'mainControllerId': _controllerId,
+      };
+      harness.registry.controllerData[_controllerId] = {
+        'activeHouseId': 'owner-1',
+      };
+      final session = await harness.service.createPairingSession(_owner);
 
-    await expectLater(
-      harness.service.pairWithController(
-        user: _owner,
-        session: session,
-        device: _device,
-      ),
-      throwsA(isA<MainControllerPairingException>().having(
-        (error) => error.code,
-        'code',
-        'registry-not-confirmed',
-      )),
-    );
-  });
+      await expectLater(
+        harness.service.pairWithController(
+          user: _owner,
+          session: session,
+          device: _device,
+        ),
+        throwsA(
+          isA<MainControllerPairingException>().having(
+            (error) => error.code,
+            'code',
+            'registry-not-confirmed',
+          ),
+        ),
+      );
+    },
+  );
 
   test('invalid GATT service prevents token write', () async {
     final harness = _Harness();
@@ -419,6 +476,138 @@ void main() {
   );
 
   testWidgets(
+    'status stream error does not block an approved owner from pairing',
+    (tester) async {
+      final harness = _Harness();
+      harness.registry.watchError = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+        message: 'Missing or insufficient permissions.',
+      );
+
+      await _pumpPairingScreen(tester, harness, user: _owner);
+
+      expect(find.text('Controller status unavailable'), findsOneWidget);
+      expect(_startPairingButton(tester).onPressed, isNotNull);
+    },
+  );
+
+  testWidgets('successfully read House with no controller allows pairing', (
+    tester,
+  ) async {
+    final harness = _Harness();
+    harness.registry.states['owner-1'] = const ControllerRegistryState(
+      houseExists: true,
+    );
+
+    await _pumpPairingScreen(tester, harness, user: _owner);
+
+    expect(find.text('No Main Controller connected'), findsOneWidget);
+    expect(_startPairingButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('confirmed missing House keeps pairing disabled', (tester) async {
+    final harness = _Harness();
+    harness.registry.states['owner-1'] = const ControllerRegistryState(
+      houseExists: false,
+    );
+
+    await _pumpPairingScreen(tester, harness, user: _owner);
+
+    expect(find.text('House registry not found'), findsOneWidget);
+    expect(_startPairingButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('known assigned or pending-unpair controller blocks pairing', (
+    tester,
+  ) async {
+    final assignedHarness = _Harness();
+    assignedHarness.registry.states['owner-1'] = const ControllerRegistryState(
+      houseExists: true,
+      controllerId: _controllerId,
+    );
+    await _pumpPairingScreen(tester, assignedHarness, user: _owner);
+    expect(_startPairingButton(tester).onPressed, isNull);
+
+    final pendingHarness = _Harness();
+    pendingHarness.registry.states['owner-1'] = const ControllerRegistryState(
+      houseExists: true,
+      unpairStatus: 'prepared',
+    );
+    await _pumpPairingScreen(tester, pendingHarness, user: _owner);
+    expect(_startPairingButton(tester).onPressed, isNull);
+  });
+
+  testWidgets(
+    'unauthenticated, non-owner, and unapproved users have no pairing action',
+    (tester) async {
+      final unauthenticatedHarness = _Harness();
+      await _pumpPairingScreen(
+        tester,
+        unauthenticatedHarness,
+        user: _owner,
+        authenticated: false,
+      );
+      expect(find.text('Start pairing'), findsNothing);
+
+      final memberHarness = _Harness();
+      await _pumpPairingScreen(
+        tester,
+        memberHarness,
+        user: _owner.copyWith(role: UserRole.member),
+      );
+      expect(find.text('Start pairing'), findsNothing);
+
+      final unapprovedHarness = _Harness();
+      await _pumpPairingScreen(
+        tester,
+        unapprovedHarness,
+        user: _owner.copyWith(isApproved: false),
+      );
+      expect(find.text('Start pairing'), findsNothing);
+
+      final missingHouseHarness = _Harness();
+      await _pumpPairingScreen(
+        tester,
+        missingHouseHarness,
+        user: _owner.copyWith(houseId: '   '),
+      );
+      expect(find.text('Start pairing'), findsNothing);
+
+      final missingUserHarness = _Harness();
+      await _pumpPairingScreen(tester, missingUserHarness, user: null);
+      expect(find.text('Start pairing'), findsNothing);
+    },
+  );
+
+  testWidgets('callable rejection shows its safe error and does not scan BLE', (
+    tester,
+  ) async {
+    final harness = _Harness();
+    harness.callable.sessionError = const WorkerApiException(
+      'not-found',
+      'Pairing session service was not found.',
+    );
+    harness.registry.watchError = FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'unavailable',
+      message: 'Network unavailable.',
+    );
+
+    await _pumpPairingScreen(tester, harness, user: _owner);
+    await tester.tap(find.text('Start pairing'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pairing session service was not found.'), findsOneWidget);
+    expect(
+      harness.callable.calls.single.name,
+      'createControllerPairingSession',
+    );
+    expect(harness.ble.scanCalls, 0);
+    expect(find.textContaining('connected.'), findsNothing);
+  });
+
+  testWidgets(
     'unpair requires confirmation and member screen has no pairing actions',
     (tester) async {
       final harness =
@@ -443,6 +632,7 @@ void main() {
       final overrides = [
         controllerPairingServiceProvider.overrideWithValue(harness.service),
         userProvider.overrideWith(() => _FixedUserNotifier(_owner)),
+        firebaseAuthenticatedProvider.overrideWithValue(true),
       ];
       await tester.pumpWidget(
         ProviderScope(
@@ -494,6 +684,7 @@ void main() {
             userProvider.overrideWith(
               () => _FixedUserNotifier(_owner.copyWith(role: UserRole.member)),
             ),
+            firebaseAuthenticatedProvider.overrideWithValue(true),
           ],
           child: const MaterialApp(home: MainControllerPairingScreen()),
         ),
@@ -532,6 +723,7 @@ void main() {
         overrides: [
           controllerPairingServiceProvider.overrideWithValue(harness.service),
           userProvider.overrideWith(() => _FixedUserNotifier(_owner)),
+          firebaseAuthenticatedProvider.overrideWithValue(true),
         ],
         child: const MaterialApp(home: MainControllerPairingScreen()),
       ),

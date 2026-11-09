@@ -1,0 +1,14 @@
+{
+  "name": "smartassist-cloudflare-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "test": "node --experimental-transform-types --test test/*.test.ts",
+    "typecheck": "node ../functions/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "wrangler": "^4.102.0"
+  }
+}

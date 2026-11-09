@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import '../core/mqtt_config.dart';
 import '../services/auto_detect_speech_service.dart';
 import '../services/mqtt_service.dart';
 import '../services/nlp_api_service.dart';
 import '../services/registration_service.dart';
 import '../services/main_controller_pairing_service.dart';
+import '../services/main_controller_worker_client.dart';
 
 final mqttConfigProvider = Provider<MqttConfig>((ref) => const MqttConfig());
 
@@ -24,9 +24,10 @@ final registrationServiceProvider = Provider<HouseRegistrationService>((ref) {
 final controllerPairingServiceProvider = Provider<ControllerPairingService>((
   ref,
 ) {
-  final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+  final api = MainControllerWorkerClient();
+  ref.onDispose(api.close);
   return ControllerPairingService(
-    callable: FirebaseCallableInvoker(functions: functions),
+    api: api,
     ble: FlutterReactiveMainControllerBleAdapter(),
     registry: FirestoreControllerRegistryReader(),
   );

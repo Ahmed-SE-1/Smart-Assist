@@ -1,0 +1,91 @@
+[1/10] Performing build step for 'bootloader'
+[1/1] cmd.exe /C "cd /D "D:\Ahmed\SmartAssist-FYP\SmartAssist App\Smart-Assist\firmware\main_controller\idf_project\build\bootloader\esp-idf\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\python_env\idf5.1_py3.13_env\Scripts\python.exe" "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/check_sizes.py" --offset 0x8000 bootloader 0x1000 "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/bootloader.bin""
+Bootloader binary size 0x6860 bytes. 0x7a0 bytes (7%) free.
+[2/8] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/main/main.cpp:18:6: warning: 'bool {anonymous}::initializeEncryptedNvs()' defined but not used [-Wunused-function]
+   18 | bool initializeEncryptedNvs() {
+      |      ^~~~~~~~~~~~~~~~~~~~~~
+[3/8] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/firmware.cpp.obj
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/main/firmware.cpp:2:
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool callablePost(const char*, ArduinoJson::V721PB22::JsonDocument&, const String&, ArduinoJson::V721PB22::JsonDocument&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:283:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  283 |   StaticJsonDocument<2048> request;
+      |   ^~~~~~~~~~~~~~~~~~
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.hpp:56,
+                 from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.h:9,
+                 from d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:7:
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool signInWithCustomToken(const String&, const String&, String&, String&, int&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:305:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  305 |   StaticJsonDocument<2048> request;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:317:31: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  317 |   DynamicJsonDocument response(4096);
+      |                               ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool refreshFirebaseIdToken(bool)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:351:31: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  351 |   DynamicJsonDocument response(4096);
+      |                               ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void sendBleFailure(const char*)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:524:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  524 |   StaticJsonDocument<160> response;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void sendBlePairingSuccess(const String&, const String&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:536:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  536 |   StaticJsonDocument<320> response;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:539:50: warning: 'ArduinoJson::V721PB22::JsonObject ArduinoJson::V721PB22::JsonDocument::createNestedObject(TChar*) [with TChar = const char]' is deprecated: use doc[key].to<JsonObject>() instead [-Wdeprecated-declarations]
+  539 |   JsonObject result = response.createNestedObject("result");
+      |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.hpp:33:
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/Document/JsonDocument.hpp:363:14: note: declared here
+  363 |   JsonObject createNestedObject(TChar* key) {
+      |              ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In member function 'virtual void PairingRequestCallbacks::onWrite(BLECharacteristic*)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:568:5: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  568 |     StaticJsonDocument<160> request;
+      |     ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void processPairingRequests()':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:845:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  845 |   StaticJsonDocument<256> data;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:847:36: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  847 |   DynamicJsonDocument claimResponse(8192);
+      |                                    ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+[4/8] Linking C static library esp-idf\main\libmain.a
+[5/8] Generating ld/sections.ld
+[6/8] Linking CXX executable smartassist_main_controller.elf
+[7/8] Generating binary image from built executable
+esptool.py v4.13.0
+Creating esp32 image...
+Merged 27 ELF sections
+Successfully created esp32 image.
+Generated D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/smartassist_main_controller.bin
+[8/8] cmd.exe /C "cd /D "D:\Ahmed\SmartAssist-FYP\SmartAssist App\Smart-Assist\firmware\main_controller\idf_project\build\esp-idf\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\python_env\idf5.1_py3.13_env\Scripts\python.exe" "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/check_sizes.py" --offset 0x8000 partition --type app "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/partition_table/partition-table.bin" "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/smartassist_main_controller.bin""
+smartassist_main_controller.bin binary size 0x178200 bytes. Smallest app partition is 0x3e0000 bytes. 0x267e00 bytes (62%) free.

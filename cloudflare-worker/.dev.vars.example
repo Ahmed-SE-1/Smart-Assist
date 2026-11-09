@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local work. Never put real values in this file.
+FIREBASE_PROJECT_ID=smartassist-18d2a
+FIREBASE_WEB_API_KEY=replace-with-public-firebase-web-api-key
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"replace-me","private_key_id":"replace-me","private_key":"-----BEGIN PRIVATE KEY-----\nreplace-me\n-----END PRIVATE KEY-----\n","client_email":"replace-me@example.iam.gserviceaccount.com","token_uri":"https://oauth2.googleapis.com/token"}
+CORS_ALLOWED_ORIGINS=http://localhost:5000
+MAX_REQUEST_BYTES=16384
+ENVIRONMENT=development

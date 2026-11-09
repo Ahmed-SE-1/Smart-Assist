@@ -156,7 +156,11 @@ service cloud.firestore {
     }
 
     match /houses/{houseId} {
-      allow get: if resource.data.houseId == houseId && isHouseMember(houseId);
+      // An authorized House member may also read the absent registry document
+      // for their own House ID so the app can distinguish "not created" from
+      // "permission denied". Existing documents must still match the path.
+      allow get: if isHouseMember(houseId)
+        && (resource == null || resource.data.get('houseId', houseId) == houseId);
       allow list: if signedIn() && isHouseOwner(resource.data.houseId);
 
       // Owner creates their own house record during signup or legacy backfill

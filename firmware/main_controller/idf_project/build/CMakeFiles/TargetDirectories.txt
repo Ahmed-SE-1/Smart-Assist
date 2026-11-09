@@ -384,6 +384,7 @@ D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/i
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/esp_wifi/CMakeFiles/install.dir
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/esp_wifi/CMakeFiles/install/local.dir
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/esp_wifi/CMakeFiles/install/strip.dir
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/bt/CMakeFiles/__idf_bt.dir
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/bt/CMakeFiles/edit_cache.dir
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/bt/CMakeFiles/rebuild_cache.dir
 D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/esp-idf/bt/CMakeFiles/list_install_components.dir

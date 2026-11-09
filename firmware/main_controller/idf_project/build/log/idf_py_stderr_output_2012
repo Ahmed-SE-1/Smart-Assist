@@ -1,0 +1,29 @@
+--- WARNING: GDB cannot open serial ports accessed as COMx
+--- NOTE: Using \\.\COM10 instead...
+--- esp-idf-monitor 1.10.0 on \\.\COM10 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+--- 0x40080400: _init at ??:?
+--- 0x400814ec: call_start_cpu1 at C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esp_system/port/cpu_start.c:159
+--- 0x40080400: _init at ??:?
+--- 0x400814ec: call_start_cpu1 at C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esp_system/port/cpu_start.c:159
+--- ERROR: ClearCommError failed (PermissionError(13, 'Access is denied.', None, 5))
+--- Waiting for the device to reconnect..................................................................................................................................................................--- NOTE: To exit from IDF monitor please use "Ctrl+]". Alternatively, you can use Ctrl+T Ctrl+X to exit.
+.......
+
+Traceback (most recent call last):
+  File "C:\Users\LAPTOPS LOUNGE\esp\esp-idf-v5.1.4\tools/idf_monitor.py", line 11, in <module>
+    sys.exit(subprocess.run([sys.executable, '-m', 'esp_idf_monitor'] + sys.argv[1:]).returncode)
+             ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LAPTOPS LOUNGE\AppData\Local\Programs\Python\Python313\Lib\subprocess.py", line 556, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\LAPTOPS LOUNGE\AppData\Local\Programs\Python\Python313\Lib\subprocess.py", line 1214, in communicate
+    self.wait()
+    ~~~~~~~~~^^
+  File "C:\Users\LAPTOPS LOUNGE\AppData\Local\Programs\Python\Python313\Lib\subprocess.py", line 1280, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\LAPTOPS LOUNGE\AppData\Local\Programs\Python\Python313\Lib\subprocess.py", line 1606, in _wait
+    result = _winapi.WaitForSingleObject(self._handle,
+                                         timeout_millis)
+KeyboardInterrupt

@@ -79,6 +79,16 @@ class _Mqtt extends MqttService {
 }
 
 void main() {
+  test(
+    'default mobile MQTT config never reads credentials from dart-define',
+    () {
+      const config = MqttConfig(enabled: true, host: 'broker.example');
+      expect(config.username, isEmpty);
+      expect(config.password, isEmpty);
+      expect(config.connectionError, contains('username or password'));
+    },
+  );
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const savedRoom = {

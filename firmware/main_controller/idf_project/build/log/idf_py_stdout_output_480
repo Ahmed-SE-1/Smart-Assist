@@ -1,0 +1,134 @@
+[1/10] Performing build step for 'bootloader'
+[1/1] cmd.exe /C "cd /D "D:\Ahmed\SmartAssist-FYP\SmartAssist App\Smart-Assist\firmware\main_controller\idf_project\build\bootloader\esp-idf\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\python_env\idf5.1_py3.13_env\Scripts\python.exe" "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/check_sizes.py" --offset 0x8000 bootloader 0x1000 "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/bootloader.bin""
+Bootloader binary size 0x6860 bytes. 0x7a0 bytes (7%) free.
+[2/8] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/firmware.cpp.obj
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/main/firmware.cpp:2:
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool callablePost(const char*, ArduinoJson::V721PB22::JsonDocument&, const String&, ArduinoJson::V721PB22::JsonDocument&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:280:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  280 |   StaticJsonDocument<2048> request;
+      |   ^~~~~~~~~~~~~~~~~~
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.hpp:56,
+                 from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.h:9,
+                 from d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:7:
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool signInWithCustomToken(const String&, const String&, String&, String&, int&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:302:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  302 |   StaticJsonDocument<2048> request;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:314:31: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  314 |   DynamicJsonDocument response(4096);
+      |                               ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool refreshFirebaseIdToken(bool)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:345:31: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  345 |   DynamicJsonDocument response(4096);
+      |                               ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void sendBleFailure(const char*)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:484:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  484 |   StaticJsonDocument<160> response;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void sendBlePairingSuccess(const String&, const String&)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:496:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  496 |   StaticJsonDocument<320> response;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:499:50: warning: 'ArduinoJson::V721PB22::JsonObject ArduinoJson::V721PB22::JsonDocument::createNestedObject(TChar*) [with TChar = const char]' is deprecated: use doc[key].to<JsonObject>() instead [-Wdeprecated-declarations]
+  499 |   JsonObject result = response.createNestedObject("result");
+      |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+In file included from D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson.hpp:33:
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/Document/JsonDocument.hpp:363:14: note: declared here
+  363 |   JsonObject createNestedObject(TChar* key) {
+      |              ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In member function 'virtual void PairingRequestCallbacks::onWrite(BLECharacteristic*)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:522:5: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  522 |     StaticJsonDocument<160> request;
+      |     ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'bool acknowledgeUnpair(bool)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:592:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  592 |   StaticJsonDocument<256> data;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:595:31: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  595 |   DynamicJsonDocument response(2048);
+      |                               ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void receiveUnpairControl(const byte*, unsigned int)':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:633:30: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  633 |   DynamicJsonDocument message(768);
+      |                              ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino: In function 'void processPairingRequests()':
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:758:3: warning: 'template<unsigned int N> class ArduinoJson::V721PB22::StaticJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  758 |   StaticJsonDocument<256> data;
+      |   ^~~~~~~~~~~~~~~~~~
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:63:58: note: declared here
+   63 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") StaticJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~
+d:\ahmed\smartassist-fyp\smartassist app\smart-assist\firmware\main_controller\maincontroller.ino:760:36: warning: 'DynamicJsonDocument' is deprecated: use JsonDocument instead [-Wdeprecated-declarations]
+  760 |   DynamicJsonDocument claimResponse(8192);
+      |                                    ^
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/bblanchon__arduinojson/src/ArduinoJson/compatibility.hpp:125:58: note: declared here
+  125 | class ARDUINOJSON_DEPRECATED("use JsonDocument instead") DynamicJsonDocument
+      |                                                          ^~~~~~~~~~~~~~~~~~~
+[3/8] Linking C static library esp-idf\main\libmain.a
+[4/8] Generating ld/sections.ld
+[5/8] Building C object CMakeFiles/smartassist_main_controller.elf.dir/project_elf_src_esp32.c.obj
+[6/8] Linking CXX executable smartassist_main_controller.elf
+FAILED: smartassist_main_controller.elf 
+cmd.exe /C "cd . && C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT1FE9~1.EXE -mlongcalls -Wno-frame-address -Wl,--cref -Wl,--defsym=IDF_TARGET_ESP32=0 "-Wl,--Map=D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/smartassist_main_controller.map" -Wl,--no-warn-rwx-segments -fno-rtti -fno-lto -Wl,--gc-sections -Wl,--warn-common -T esp32.peripherals.ld -T esp32.rom.ld -T esp32.rom.api.ld -T esp32.rom.libgcc.ld -T esp32.rom.newlib-data.ld -T esp32.rom.syscalls.ld -T esp32.rom.newlib-funcs.ld -T memory.ld -T sections.ld @CMakeFiles\smartassist_main_controller.elf.rsp -o smartassist_main_controller.elf  && cd ."
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure4stopEv+0x0): undefined reference to `stop_ssl_socket(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure5writeEPKhj+0xc): undefined reference to `send_net_data(sslclient_context*, unsigned char const*, unsigned int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure5writeEPKhj+0x10): undefined reference to `send_ssl_data(sslclient_context*, unsigned char const*, unsigned int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure4readEPhj+0x8): undefined reference to `get_net_receive(sslclient_context*, unsigned char*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure4readEPhj+0xc): undefined reference to `get_ssl_receive(sslclient_context*, unsigned char*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure9availableEv+0xc): undefined reference to `peek_net_receive(sslclient_context*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure9availableEv+0x10): undefined reference to `data_to_read(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure7connectE9IPAddresstPKcS2_S2_S2_+0x8): undefined reference to `start_ssl_client(sslclient_context*, IPAddress const&, unsigned long, char const*, int, char const*, bool, char const*, char const*, char const*, char const*, bool, char const**)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecure7connectE9IPAddresstPKcS2_S2_S2_+0xc): undefined reference to `ssl_starttls_handshake(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj):(.literal._ZN19NetworkClientSecureC2Ev+0x4): undefined reference to `ssl_init(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::stop()':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:102: undefined reference to `stop_ssl_socket(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::NetworkClientSecure()::{lambda(sslclient_context*)#1}::operator()(sslclient_context*) const':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:36: undefined reference to `stop_ssl_socket(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::write(unsigned char const*, unsigned int)':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:231: undefined reference to `send_net_data(sslclient_context*, unsigned char const*, unsigned int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:242: undefined reference to `send_ssl_data(sslclient_context*, unsigned char const*, unsigned int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::read(unsigned char*, unsigned int)':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:253: undefined reference to `get_net_receive(sslclient_context*, unsigned char*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:286: undefined reference to `get_ssl_receive(sslclient_context*, unsigned char*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::available()':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:298: undefined reference to `peek_net_receive(sslclient_context*, int)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:305: undefined reference to `data_to_read(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::connect(IPAddress, unsigned short, char const*, char const*, char const*, char const*)':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:148: undefined reference to `start_ssl_client(sslclient_context*, IPAddress const&, unsigned long, char const*, int, char const*, bool, char const*, char const*, char const*, char const*, bool, char const**)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:151: undefined reference to `ssl_starttls_handshake(sslclient_context*)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::connect(char const*, unsigned short, char const*, char const*)':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:196: undefined reference to `start_ssl_client(sslclient_context*, IPAddress const&, unsigned long, char const*, int, char const*, bool, char const*, char const*, char const*, char const*, bool, char const**)'
+c:/users/laptop~1/espres~1/tools/xtensa~2/esp-12~1.0_2/xtensa~1/bin/../lib/gcc/xtensa-esp32-elf/12.2.0/../../../../xtensa-esp32-elf/bin/ld.exe: esp-idf/espressif__arduino-esp32/libespressif__arduino-esp32.a(NetworkClientSecure.cpp.obj): in function `NetworkClientSecure::NetworkClientSecure()':
+D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/managed_components/espressif__arduino-esp32/libraries/NetworkClientSecure/src/NetworkClientSecure.cpp:35: undefined reference to `ssl_init(sslclient_context*)'
+collect2.exe: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.

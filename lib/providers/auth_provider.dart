@@ -589,3 +589,7 @@ class AuthNotifier extends Notifier<AuthState> {
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(
   AuthNotifier.new,
 );
+
+final firebaseAuthenticatedProvider = Provider<bool>(
+  (ref) => firebase.FirebaseAuth.instance.currentUser != null,
+);

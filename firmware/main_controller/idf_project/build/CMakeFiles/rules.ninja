@@ -855,6 +855,37 @@ rule C_STATIC_LIBRARY_LINKER____idf_esp_wifi_
 
 
 #############################################
+# Rule for compiling ASM files.
+
+rule ASM_COMPILER____idf_bt_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT8994~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building ASM object $out
+
+
+#############################################
+# Rule for compiling C files.
+
+rule C_COMPILER____idf_bt_
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ccache C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT8994~1.EXE $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building C object $out
+
+
+#############################################
+# Rule for linking C static library.
+
+rule C_STATIC_LIBRARY_LINKER____idf_bt_
+  command = cmd.exe /C "$PRE_LINK && "C:\Users\LAPTOPS LOUNGE\.espressif\tools\cmake\3.24.0\bin\cmake.exe" -E rm -f $TARGET_FILE && C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT4B0D~1.EXE qc $TARGET_FILE $LINK_FLAGS @$RSP_FILE && C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XTB6C5~1.EXE $TARGET_FILE && $POST_BUILD"
+  description = Linking C static library $TARGET_FILE
+  rspfile = $RSP_FILE
+  rspfile_content = $in $LINK_PATH $LINK_LIBRARIES
+  restat = $RESTAT
+
+
+#############################################
 # Rule for compiling C files.
 
 rule C_COMPILER____idf_unity_

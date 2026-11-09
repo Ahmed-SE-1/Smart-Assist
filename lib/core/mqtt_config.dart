@@ -1,33 +1,38 @@
-/// Build-time configuration for the isolated Phase-1 MQTT test.
+/// MQTT configuration for test-only direct broker clients.
 ///
-/// Do not ship broker credentials in a production mobile app. These values are
-/// supplied with `--dart-define` so no secret is committed here.
+/// Production mobile builds must not receive broker credentials through
+/// dart-define: values compiled into an app package are extractable. Secure
+/// owner command publishing through the Worker is not implemented yet, so the
+/// default app configuration intentionally has no broker credentials.
 class MqttConfig {
   const MqttConfig({
     bool? enabled,
     this.host = const String.fromEnvironment('MQTT_HOST'),
     this.port = const int.fromEnvironment('MQTT_PORT', defaultValue: 8883),
-    this.username = const String.fromEnvironment('MQTT_USERNAME'),
-    this.password = const String.fromEnvironment('MQTT_PASSWORD'),
+    this.username = '',
+    this.password = '',
     this.clientId = const String.fromEnvironment('MQTT_CLIENT_ID'),
     this.caAsset = const String.fromEnvironment(
       'MQTT_CA_ASSET',
       defaultValue: 'assets/certs/emqx_ca.crt',
     ),
-    this.testAppDeviceId = const String.fromEnvironment('MQTT_TEST_APP_DEVICE_ID'),
+    this.testAppDeviceId = const String.fromEnvironment(
+      'MQTT_TEST_APP_DEVICE_ID',
+    ),
     this.testMqttDeviceId = const String.fromEnvironment(
       'MQTT_TEST_MQTT_DEVICE_ID',
-      defaultValue: const String.fromEnvironment('MQTT_TEST_DEVICE_ID'),
+      defaultValue: String.fromEnvironment('MQTT_TEST_DEVICE_ID'),
     ),
     this.testChannel = const int.fromEnvironment('MQTT_TEST_CHANNEL'),
-  }) : enabled = enabled ??
-            const bool.fromEnvironment(
-              'MQTT_ENABLED',
-              defaultValue: const bool.fromEnvironment(
-                'MQTT_ENABLE_REAL_TEST',
-                defaultValue: false,
-              ),
-            );
+  }) : enabled =
+           enabled ??
+           const bool.fromEnvironment(
+             'MQTT_ENABLED',
+             defaultValue: bool.fromEnvironment(
+               'MQTT_ENABLE_REAL_TEST',
+               defaultValue: false,
+             ),
+           );
 
   final bool enabled;
   final String host;
