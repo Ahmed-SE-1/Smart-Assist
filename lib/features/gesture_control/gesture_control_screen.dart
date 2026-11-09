@@ -94,7 +94,7 @@ class _GestureControlScreenState extends ConsumerState<GestureControlScreen> {
 
   void _syncDataFromProvider() {
     final rooms = ref.read(visibleRoomsProvider);
-    final devices = ref.read(devicesProvider);
+    final devices = ref.read(visibleDevicesProvider);
 
     _stateMachine.updateData(
       rooms: rooms

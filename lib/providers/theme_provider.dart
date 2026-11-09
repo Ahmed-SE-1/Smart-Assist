@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,6 +45,86 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
       isHighContrast: prefs.getBool('isHighContrast') ?? false,
       fontSizeFactor: prefs.getDouble('fontSizeFactor') ?? 1.0,
     );
+
+    // Sync from Firestore if user is authenticated
+    final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data();
+          if (data != null) {
+            bool changed = false;
+            var isDark = state.isDarkMode;
+            var isHigh = state.isHighContrast;
+            var fontFactor = state.fontSizeFactor;
+
+            if (data['isDarkMode'] is bool && data['isDarkMode'] != isDark) {
+              isDark = data['isDarkMode'] as bool;
+              await prefs.setBool('isDarkMode', isDark);
+              changed = true;
+            }
+            if (data['isHighContrast'] is bool && data['isHighContrast'] != isHigh) {
+              isHigh = data['isHighContrast'] as bool;
+              await prefs.setBool('isHighContrast', isHigh);
+              changed = true;
+            }
+            if (data['fontSizeFactor'] is num && (data['fontSizeFactor'] as num).toDouble() != fontFactor) {
+              fontFactor = (data['fontSizeFactor'] as num).toDouble();
+              await prefs.setDouble('fontSizeFactor', fontFactor);
+              changed = true;
+            }
+            if (changed) {
+              state = ThemeSettings(
+                isDarkMode: isDark,
+                isHighContrast: isHigh,
+                fontSizeFactor: fontFactor,
+              );
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  void _saveToFirestore(String key, dynamic value) {
+    final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({key: value})
+          .catchError((_) {});
+    }
+  }
+
+  Future<void> resetToDefaults() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('isDarkMode');
+    await prefs.remove('isHighContrast');
+    await prefs.remove('fontSizeFactor');
+    state = const ThemeSettings(
+      isDarkMode: false,
+      isHighContrast: false,
+      fontSizeFactor: 1.0,
+    );
+  }
+
+  Future<void> syncFromUserDoc(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    var isDark = data['isDarkMode'] is bool ? data['isDarkMode'] as bool : false;
+    var isHigh = data['isHighContrast'] is bool ? data['isHighContrast'] as bool : false;
+    var fontFactor = data['fontSizeFactor'] is num ? (data['fontSizeFactor'] as num).toDouble() : 1.0;
+
+    await prefs.setBool('isDarkMode', isDark);
+    await prefs.setBool('isHighContrast', isHigh);
+    await prefs.setDouble('fontSizeFactor', fontFactor);
+
+    state = ThemeSettings(
+      isDarkMode: isDark,
+      isHighContrast: isHigh,
+      fontSizeFactor: fontFactor,
+    );
   }
 
   Future<void> toggleDarkMode() async {
@@ -50,6 +132,7 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
     final newValue = !state.isDarkMode;
     await prefs.setBool('isDarkMode', newValue);
     state = state.copyWith(isDarkMode: newValue);
+    _saveToFirestore('isDarkMode', newValue);
   }
 
   Future<void> toggleHighContrast() async {
@@ -57,12 +140,14 @@ class ThemeNotifier extends Notifier<ThemeSettings> {
     final newValue = !state.isHighContrast;
     await prefs.setBool('isHighContrast', newValue);
     state = state.copyWith(isHighContrast: newValue);
+    _saveToFirestore('isHighContrast', newValue);
   }
 
   Future<void> setFontSize(double size) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('fontSizeFactor', size);
     state = state.copyWith(fontSizeFactor: size);
+    _saveToFirestore('fontSizeFactor', size);
   }
 }
 

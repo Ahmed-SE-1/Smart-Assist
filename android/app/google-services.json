@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "337778532204-ve6fn1tql30bos9dnn4rgo6iop9spkp0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smart_home",
+            "certificate_hash": "5c5091436b463949cdc1632f143586300a532e49"
+          }
+        },
+        {
           "client_id": "337778532204-bhiad7j79m8h92g5lvanqke86hc80sh3.apps.googleusercontent.com",
           "client_type": 3
         }

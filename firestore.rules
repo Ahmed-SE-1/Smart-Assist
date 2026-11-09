@@ -46,6 +46,48 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/houses/$(houseId)/rooms/$(roomId)).data.get('deletionInProgress', false) != true;
     }
 
+    function validOwnerUserCreate(uid) {
+      let code = request.resource.data.joinCode;
+      let hName = request.resource.data.houseName;
+      return request.resource.data.id == uid
+        && request.resource.data.role == 'owner'
+        && request.resource.data.houseId == uid
+        && request.resource.data.isApproved == true
+        && hName is string
+        && hName.size() > 0
+        && hName.size() <= 80
+        && code is string
+        && code.matches('^[0-9]{6}$')
+        && request.resource.data.email is string
+        && request.resource.data.name is string
+        && getAfter(/databases/$(database)/documents/houses/$(uid)).data.houseId == uid
+        && getAfter(/databases/$(database)/documents/houses/$(uid)).data.ownerUid == uid
+        && getAfter(/databases/$(database)/documents/houses/$(uid)).data.name == hName
+        && getAfter(/databases/$(database)/documents/joinCodes/$(code)).data.ownerId == uid
+        && getAfter(/databases/$(database)/documents/joinCodes/$(code)).data.houseName == hName;
+    }
+
+    function validMemberUserCreate(uid) {
+      let ownerId = request.resource.data.houseId;
+      let joinCode = request.resource.data.joinCode;
+      return request.resource.data.id == uid
+        && request.resource.data.role == 'member'
+        && request.resource.data.isApproved == false
+        && request.resource.data.email is string
+        && request.resource.data.name is string
+        && joinCode is string
+        && joinCode.matches('^[0-9]{6}$')
+        && ownerId is string
+        && exists(/databases/$(database)/documents/joinCodes/$(joinCode))
+        && get(/databases/$(database)/documents/joinCodes/$(joinCode)).data.ownerId == ownerId
+        && exists(/databases/$(database)/documents/users/$(ownerId))
+        && profile(ownerId).data.role == 'owner'
+        && profile(ownerId).data.houseId == ownerId
+        && profile(ownerId).data.isApproved == true
+        && profile(ownerId).data.joinCode == joinCode
+        && request.resource.data.houseName == profile(ownerId).data.houseName;
+    }
+
     match /users/{uid} {
       allow get: if signedIn() && (
         request.auth.uid == uid
@@ -55,57 +97,96 @@ service cloud.firestore {
         && isHouseOwner(resource.data.houseId)
         && resource.data.houseId == profile(request.auth.uid).data.houseId;
 
-      // Profile creation and privileged profile fields are Functions-only.
-      allow create: if false;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'id', 'name', 'email', 'avatarUrl', 'role', 'houseId', 'houseName',
+          'isApproved', 'joinCode', 'assignedRoomIds'
+        ]) && (
+          validOwnerUserCreate(uid) || validMemberUserCreate(uid)
+        );
 
-      // The current app only edits display fields on the user's own profile.
-      // Owners can still approve/revoke a same-House member from Settings.
+      // The current app allows editing display & preference fields on the user's own profile.
+      // Owners can approve/revoke same-House members and update their assignedRoomIds.
       allow update: if signedIn() && (
         (request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['name', 'email', 'avatarUrl']))
+            .hasOnly(['name', 'email', 'avatarUrl', 'isDarkMode', 'isHighContrast', 'fontSizeFactor', 'voiceFeedbackEnabled', 'visualAlertsEnabled']))
         || (resource.data.role == 'member'
           && isHouseOwner(resource.data.houseId)
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['isApproved'])
-          && request.resource.data.isApproved is bool)
+            .hasOnly(['isApproved', 'assignedRoomIds'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isApproved']) || request.resource.data.isApproved is bool)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedRoomIds']) || request.resource.data.assignedRoomIds is list))
       );
       allow delete: if false;
     }
 
-    // Signup and index repair now run through authenticated trusted Functions.
     match /joinCodes/{code} {
-      allow read, write: if false;
+      allow get: if signedIn() && code.matches('^[0-9]{6}$');
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('^[0-9]{6}$')
+        && request.resource.data.keys().hasOnly(['ownerId', 'houseName'])
+        && request.resource.data.ownerId == request.auth.uid
+        && (
+          (hasProfile(request.auth.uid) && profile(request.auth.uid).data.role == 'owner')
+          || (getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner')
+        );
+      allow update, delete: if false;
     }
 
     match /houseNames/{nameKey} {
-      allow read, write: if false;
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerId'])
+        && request.resource.data.ownerId == request.auth.uid
+        && (
+          (hasProfile(request.auth.uid) && profile(request.auth.uid).data.role == 'owner')
+          || (getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner')
+        );
+      allow update, delete: if false;
+    }
+
+    function memberAssignedRoom(houseId, roomId) {
+      return isHouseMember(houseId)
+        && profile(request.auth.uid).data.role == 'member'
+        && roomId in profile(request.auth.uid).data.get('assignedRoomIds', []);
     }
 
     match /houses/{houseId} {
       allow get: if resource.data.houseId == houseId && isHouseMember(houseId);
       allow list: if signedIn() && isHouseOwner(resource.data.houseId);
 
-      // Enables the explicit owner-only legacy registry backfill. Existing
-      // House documents cannot be overwritten; pairing fields stay null here.
+      // Owner creates their own house record during signup or legacy backfill
       allow create: if signedIn()
         && request.auth.uid == houseId
-        && profile(request.auth.uid).data.role == 'owner'
-        && profile(request.auth.uid).data.houseId == houseId
+        && request.resource.data.houseId == houseId
+        && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly([
           'houseId', 'ownerUid', 'name', 'mainControllerId', 'createdAt', 'updatedAt'
         ])
-        && request.resource.data.houseId == houseId
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.name == profile(request.auth.uid).data.houseName
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
         && request.resource.data.mainControllerId == null
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
+        && (
+          (hasProfile(request.auth.uid)
+            && profile(request.auth.uid).data.role == 'owner'
+            && profile(request.auth.uid).data.houseId == houseId
+            && profile(request.auth.uid).data.houseName == request.resource.data.name)
+          ||
+          (getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.houseId == houseId
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.houseName == request.resource.data.name)
+        );
       allow update, delete: if false;
 
       match /rooms/{roomId} {
-        allow get, list: if isHouseMember(houseId);
-        allow create: if isHouseMember(houseId)
+        allow get: if isHouseOwner(houseId) || memberAssignedRoom(houseId, roomId);
+        allow list: if isHouseOwner(houseId)
+          || (isHouseMember(houseId) && resource.data.id in profile(request.auth.uid).data.get('assignedRoomIds', []));
+        allow create: if isHouseOwner(houseId)
           && request.resource.data.id == roomId
           && request.resource.data.creatorId == request.auth.uid
           && request.resource.data.name is string
@@ -117,7 +198,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'id', 'name', 'iconAsset', 'esp32NodeId', 'mqttNodeId', 'creatorId', 'creatorName'
           ]);
-        allow update: if canManageRoom(houseId, roomId)
+        allow update: if isHouseOwner(houseId)
           && resource.data.get('deletionInProgress', false) != true
           && request.resource.data.get('deletionInProgress', false) != true
           && request.resource.data.id == roomId
@@ -131,17 +212,20 @@ service cloud.firestore {
           && request.resource.data.esp32NodeId is string
           && (request.resource.data.mqttNodeId == null || request.resource.data.mqttNodeId in ['ROOM1_NODE', 'ROOM2_NODE'])
           && request.resource.data.creatorName is string;
-        allow update: if canManageRoom(houseId, roomId)
+        allow update: if isHouseOwner(houseId)
           && resource.data.get('deletionInProgress', false) != true
           && request.resource.data.get('deletionInProgress', false) == true
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionInProgress']);
-        allow delete: if canManageRoom(houseId, roomId)
+        allow delete: if isHouseOwner(houseId)
           && resource.data.get('deletionInProgress', false) == true;
       }
 
       match /devices/{deviceId} {
-        allow get, list: if isHouseMember(houseId);
-        allow create: if isHouseMember(houseId)
+        allow get: if isHouseOwner(houseId)
+          || (isHouseMember(houseId) && resource.data.roomId in profile(request.auth.uid).data.get('assignedRoomIds', []));
+        allow list: if isHouseOwner(houseId)
+          || (isHouseMember(houseId) && resource.data.roomId in profile(request.auth.uid).data.get('assignedRoomIds', []));
+        allow create: if isHouseOwner(houseId)
           && request.resource.data.id == deviceId
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
@@ -155,27 +239,32 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'id', 'name', 'type', 'roomId', 'sensorType', 'channel'
           ])
-          && roomIsActive(houseId, request.resource.data.roomId)
-          && canManageRoom(houseId, request.resource.data.roomId);
-        allow update: if isHouseMember(houseId)
+          && roomIsActive(houseId, request.resource.data.roomId);
+        // Owner full configuration update
+        allow update: if isHouseOwner(houseId)
           && request.resource.data.id == deviceId
+          && request.resource.data.roomId == resource.data.roomId
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.type in ['light', 'fan', 'ac', 'sensor']
-          && request.resource.data.roomId is string
           && request.resource.data.sensorType is string
           && (request.resource.data.channel == null || request.resource.data.channel is int)
           && ((request.resource.data.type == 'fan' && request.resource.data.channel == 1)
             || (request.resource.data.type == 'light' && request.resource.data.channel == 2)
             || (request.resource.data.type in ['ac', 'sensor'] && request.resource.data.channel == null))
           && request.resource.data.keys().hasOnly([
-            'id', 'name', 'type', 'roomId', 'sensorType', 'channel'
+            'id', 'name', 'type', 'roomId', 'sensorType', 'channel',
+            'isOn', 'fanSpeed', 'acTemperature', 'sensorValue'
           ])
-          && roomIsActive(houseId, request.resource.data.roomId)
-          && canManageRoom(houseId, request.resource.data.roomId)
-          && canManageRoom(houseId, resource.data.roomId);
-        allow delete: if isHouseMember(houseId)
-          && canManageRoom(houseId, resource.data.roomId);
+          && roomIsActive(houseId, request.resource.data.roomId);
+        // Operational state update by owner or assigned approved member
+        allow update: if (isHouseOwner(houseId) || (isHouseMember(houseId) && resource.data.roomId in profile(request.auth.uid).data.get('assignedRoomIds', [])))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOn', 'fanSpeed', 'acTemperature', 'sensorValue'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isOn']) || request.resource.data.isOn is bool)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['fanSpeed']) || request.resource.data.fanSpeed is int)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['acTemperature']) || request.resource.data.acTemperature is int)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sensorValue']) || (request.resource.data.sensorValue is int || request.resource.data.sensorValue is float));
+        allow delete: if isHouseOwner(houseId);
       }
     }
 

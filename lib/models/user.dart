@@ -11,9 +11,13 @@ class User {
   // Role-Based features
   final UserRole role;
   final String? houseId;
-  final String? houseName; // NEW: House Name / Number add kar diya
+  final String? houseName;
   final bool isApproved;
   final String? joinCode;
+
+  /// Room IDs the owner has assigned to this member.
+  /// Owners always have full access — this list is only meaningful for members.
+  final List<String> assignedRoomIds;
 
   User({
     required this.id,
@@ -22,9 +26,10 @@ class User {
     this.avatarUrl,
     this.role = UserRole.owner,
     this.houseId,
-    this.houseName, // NEW
+    this.houseName,
     this.isApproved = true,
     this.joinCode,
+    this.assignedRoomIds = const [],
   });
 
   /// Riverpod ke userProvider mein data update karne ke liye
@@ -35,9 +40,10 @@ class User {
     String? avatarUrl,
     UserRole? role,
     String? houseId,
-    String? houseName, // NEW
+    String? houseName,
     bool? isApproved,
     String? joinCode,
+    List<String>? assignedRoomIds,
   }) {
     return User(
       id: id ?? this.id,
@@ -46,9 +52,10 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
       houseId: houseId ?? this.houseId,
-      houseName: houseName ?? this.houseName, // NEW
+      houseName: houseName ?? this.houseName,
       isApproved: isApproved ?? this.isApproved,
       joinCode: joinCode ?? this.joinCode,
+      assignedRoomIds: assignedRoomIds ?? this.assignedRoomIds,
     );
   }
 
@@ -61,14 +68,19 @@ class User {
       'avatarUrl': avatarUrl,
       'role': role.name,
       'houseId': houseId,
-      'houseName': houseName, // NEW: Database mein ab yeh save hoga
+      'houseName': houseName,
       'isApproved': isApproved,
       'joinCode': joinCode,
+      'assignedRoomIds': assignedRoomIds,
     };
   }
 
   /// Firestore se data read karne ke liye (JSON to Object)
   factory User.fromMap(Map<String, dynamic> map) {
+    final rawIds = map['assignedRoomIds'];
+    final ids = rawIds is List
+        ? rawIds.whereType<String>().toList()
+        : <String>[];
     return User(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
@@ -76,9 +88,10 @@ class User {
       avatarUrl: map['avatarUrl'],
       role: map['role'] == 'member' ? UserRole.member : UserRole.owner,
       houseId: map['houseId'],
-      houseName: map['houseName'], // NEW: Database se read hoga
+      houseName: map['houseName'],
       isApproved: map['isApproved'] ?? true,
       joinCode: map['joinCode'],
+      assignedRoomIds: ids,
     );
   }
 }

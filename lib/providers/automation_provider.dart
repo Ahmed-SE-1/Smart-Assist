@@ -78,6 +78,12 @@ class AutomationNotifier extends Notifier<List<AutomationRule>> {
         continue;
       }
 
+      final user = ref.read(userProvider);
+      if (user?.role == UserRole.member && !user!.assignedRoomIds.contains(targetDevice.roomId)) {
+        updatedRules.add(rule);
+        continue;
+      }
+
       double currentValue = 0.0;
       if (rule.property == 'speed') {
         currentValue = targetDevice.fanSpeed.toDouble();

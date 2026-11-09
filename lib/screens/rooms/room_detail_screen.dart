@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/device.dart';
 import '../../models/room.dart';
+import '../../models/user.dart';
+import '../../providers/user_provider.dart';
 import '../../providers/smart_home_provider.dart';
 import '../../providers/accessibility_provider.dart';
 
@@ -38,6 +40,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
     );
     final devices = ref.watch(devicesByRoomProvider(room.id));
     final deviceSyncError = ref.watch(deviceSyncErrorProvider);
+    final currentUser = ref.watch(userProvider);
+    final isOwner = currentUser?.role == UserRole.owner;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
@@ -50,22 +54,24 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Color(0xFF2D3436)),
-            tooltip: 'Add new device', // TalkBack will read this
-            onPressed: () => _showAddDeviceDialog(room.id),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF2D3436)),
-            onSelected: (value) {
-              if (value == 'edit') {
-                _showEditRoomDialog(
-                  room.id,
-                  room.name,
-                  room.iconAsset,
-                  room.mqttNodeId,
-                );
-              } else if (value == 'delete') {
+          if (isOwner)
+            IconButton(
+              icon: const Icon(Icons.add, color: Color(0xFF2D3436)),
+              tooltip: 'Add new device', // TalkBack will read this
+              onPressed: () => _showAddDeviceDialog(room.id),
+            ),
+          if (isOwner)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Color(0xFF2D3436)),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _showEditRoomDialog(
+                    room.id,
+                    room.name,
+                    room.iconAsset,
+                    room.mqttNodeId,
+                  );
+                } else if (value == 'delete') {
                 ref.read(roomsProvider.notifier).removeRoom(room.id).then((
                   error,
                 ) {
@@ -1039,6 +1045,10 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
   /// A small trailing popup menu on device cards that allows editing or deleting the specific device.
   Widget _buildDeviceOptions(Device device) {
+    final currentUser = ref.watch(userProvider);
+    if (currentUser?.role != UserRole.owner) {
+      return const SizedBox.shrink();
+    }
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: Colors.grey),
       onSelected: (value) {

@@ -398,8 +398,8 @@ class _VoiceScreenState extends ConsumerState<VoiceScreen>
     });
 
     final mapper = VoiceCommandMapper(
-      devices: ref.read(devicesProvider),
-      rooms: ref.read(roomsProvider),
+      devices: ref.read(visibleDevicesProvider),
+      rooms: ref.read(visibleRoomsProvider),
       notifier: ref.read(devicesProvider.notifier),
     );
 

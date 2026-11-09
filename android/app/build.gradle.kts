@@ -13,7 +13,7 @@ android {
     // camera_android_camerax 0.7.x pulls androidx.camera 1.6.0, which requires
     // compileSdk 36 and AGP >= 8.9.1 (see android/settings.gradle.kts).
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

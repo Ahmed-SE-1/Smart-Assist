@@ -243,15 +243,16 @@ class DashboardScreen extends ConsumerWidget {
                       color: const Color(0xFF2D3436),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => _showAddRoomDialog(context, ref),
-                    child: Text(
-                      '+ Add',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
+                  if (user?.role == UserRole.owner)
+                    TextButton(
+                      onPressed: () => _showAddRoomDialog(context, ref),
+                      child: Text(
+                        '+ Add',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 16),

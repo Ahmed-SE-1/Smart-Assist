@@ -76,10 +76,18 @@ class RoomsNotifier extends Notifier<List<Room>> {
     _activeHouseId = houseId;
     ref.read(roomSyncErrorProvider.notifier).state = null;
     if (houseId != null && houseId.isNotEmpty) {
-      _subscription = FirebaseFirestore.instance
+      if (user?.role == UserRole.member && user!.assignedRoomIds.isEmpty) {
+        state = [];
+        return [];
+      }
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('houses')
           .doc(houseId)
-          .collection('rooms')
+          .collection('rooms');
+      if (user?.role == UserRole.member) {
+        query = query.where(FieldPath.documentId, whereIn: user!.assignedRoomIds);
+      }
+      _subscription = query
           .snapshots(includeMetadataChanges: true)
           .listen(
             (snapshot) {
@@ -481,9 +489,10 @@ final visibleRoomsProvider = Provider<List<Room>>((ref) {
   final user = ref.watch(userProvider);
   final allRooms = ref.watch(roomsProvider);
 
-  if (user == null) return [];
+  if (user == null || !user.isApproved) return [];
+  if (user.role == UserRole.owner) return allRooms;
 
-  return user.isApproved ? allRooms : [];
+  return allRooms.where((r) => user.assignedRoomIds.contains(r.id)).toList();
 });
 
 // ═══════════════════════════════════════════
@@ -545,10 +554,18 @@ class DevicesNotifier extends Notifier<List<Device>> {
     _activeHouseId = houseId;
     ref.read(deviceSyncErrorProvider.notifier).state = null;
     if (houseId != null && houseId.isNotEmpty) {
-      _subscription = FirebaseFirestore.instance
+      if (user?.role == UserRole.member && user!.assignedRoomIds.isEmpty) {
+        state = [];
+        return [];
+      }
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('houses')
           .doc(houseId)
-          .collection('devices')
+          .collection('devices');
+      if (user?.role == UserRole.member) {
+        query = query.where('roomId', whereIn: user!.assignedRoomIds);
+      }
+      _subscription = query
           .snapshots(includeMetadataChanges: true)
           .listen(
             (snapshot) {
@@ -564,11 +581,12 @@ class DevicesNotifier extends Notifier<List<Device>> {
               )) {
                     final cloud = Device.fromMap({...doc.data(), 'id': doc.id});
                     final previous = live[cloud.id];
+                    final cloudData = doc.data();
                     devicesById[cloud.id] = cloud.copyWith(
-                      isOn: previous?.isOn ?? false,
-                      fanSpeed: previous?.fanSpeed ?? 0,
-                      acTemperature: previous?.acTemperature ?? 24,
-                      sensorValue: previous?.sensorValue ?? 0.0,
+                      isOn: cloudData['isOn'] is bool ? cloudData['isOn'] as bool : (previous?.isOn ?? false),
+                      fanSpeed: cloudData['fanSpeed'] is int ? cloudData['fanSpeed'] as int : (previous?.fanSpeed ?? 0),
+                      acTemperature: cloudData['acTemperature'] is int ? cloudData['acTemperature'] as int : (previous?.acTemperature ?? 24),
+                      sensorValue: cloudData['sensorValue'] is num ? (cloudData['sensorValue'] as num).toDouble() : (previous?.sensorValue ?? 0.0),
                     );
               }
               _confirmedDeviceWrites.removeWhere(
@@ -802,6 +820,19 @@ class DevicesNotifier extends Notifier<List<Device>> {
     return null;
   }
 
+  void _syncDeviceStateToFirestore(String deviceId, Map<String, dynamic> data) {
+    final houseId = ref.read(userProvider)?.houseId?.trim();
+    if (houseId != null && houseId.isNotEmpty) {
+      FirebaseFirestore.instance
+          .collection('houses')
+          .doc(houseId)
+          .collection('devices')
+          .doc(deviceId)
+          .update(data)
+          .catchError((_) {});
+    }
+  }
+
   CommandResult _failed(
     Device device,
     String action,
@@ -825,12 +856,20 @@ class DevicesNotifier extends Notifier<List<Device>> {
     final mqtt = ref.read(mqttServiceProvider);
     final config = ref.read(mqttConfigProvider);
     final user = ref.read(userProvider);
-    if (config.enabled && (user == null || !user.isApproved)) {
+    if (user == null || !user.isApproved) {
       return _failed(
         device,
         action,
         method,
         'House owner approval is required before controlling devices.',
+      );
+    }
+    if (user.role == UserRole.member && !user.assignedRoomIds.contains(device.roomId)) {
+      return _failed(
+        device,
+        action,
+        method,
+        'Access denied: You are not assigned to this room.',
       );
     }
     final isOnOff = action == 'ON' || action == 'OFF';
@@ -978,6 +1017,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
             return d;
           }).toList();
       _saveDevices();
+      _syncDeviceStateToFirestore(device.id, {'isOn': newState});
 
       ref
           .read(activityLogProvider.notifier)
@@ -1013,6 +1053,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
             return d;
           }).toList();
       _saveDevices();
+      _syncDeviceStateToFirestore(device.id, {'fanSpeed': speed, 'isOn': speed > 0});
 
       ref
           .read(activityLogProvider.notifier)
@@ -1048,6 +1089,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
             return d;
           }).toList();
       _saveDevices();
+      _syncDeviceStateToFirestore(device.id, {'acTemperature': temperature});
 
       ref
           .read(activityLogProvider.notifier)
@@ -1124,8 +1166,23 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   Future<AllDevicesOffResult> turnOffAll({String method = 'app'}) async {
-    // Use the complete house device list, regardless of room selection.
-    final devices = state.where((d) => d.type != DeviceType.sensor).toList();
+    final user = ref.read(userProvider);
+    if (user == null || !user.isApproved) {
+      return const AllDevicesOffResult(
+        controllableCount: 0,
+        alreadyOffCount: 0,
+        turnedOffCount: 0,
+        failedCount: 0,
+      );
+    }
+    // For members, only turn off devices in assigned rooms
+    final devices = state.where((d) {
+      if (d.type == DeviceType.sensor) return false;
+      if (user.role == UserRole.member) {
+        return user.assignedRoomIds.contains(d.roomId);
+      }
+      return true;
+    }).toList();
     var alreadyOff = 0;
     var turnedOff = 0;
     var failed = 0;
@@ -1205,10 +1262,23 @@ final mqttEventBridgeProvider = Provider<void>((ref) {
   });
 });
 
+final visibleDevicesProvider = Provider<List<Device>>((ref) {
+  final user = ref.watch(userProvider);
+  final allDevices = ref.watch(devicesProvider);
+  if (user == null || !user.isApproved) return [];
+  if (user.role == UserRole.owner) return allDevices;
+  return allDevices.where((d) => user.assignedRoomIds.contains(d.roomId)).toList();
+});
+
 final devicesByRoomProvider = Provider.family<List<Device>, String>((
   ref,
   roomId,
 ) {
+  final user = ref.watch(userProvider);
+  if (user == null || !user.isApproved) return [];
+  if (user.role != UserRole.owner && !user.assignedRoomIds.contains(roomId)) {
+    return [];
+  }
   final devices = ref.watch(devicesProvider);
   return devices.where((d) => d.roomId == roomId).toList();
 });
@@ -1255,18 +1325,28 @@ final activityLogProvider =
 // ═══════════════════════════════════════════
 
 final activeDeviceCountProvider = Provider<int>((ref) {
+  final user = ref.watch(userProvider);
   final devices = ref.watch(devicesProvider);
+  if (user == null || !user.isApproved) return 0;
   return devices
-      .where((d) => d.isOn && d.type != DeviceType.sensor)
-      .toList()
+      .where((d) {
+        if (!d.isOn || d.type == DeviceType.sensor) return false;
+        if (user.role == UserRole.owner) return true;
+        return user.assignedRoomIds.contains(d.roomId);
+      })
       .length;
 });
 
 final temperatureProvider = Provider<double>((ref) {
+  final user = ref.watch(userProvider);
   final devices = ref.watch(devicesProvider);
+  if (user == null || !user.isApproved) return 0.0;
   try {
     final sensor = devices.firstWhere(
-      (d) => d.type == DeviceType.sensor && d.sensorType == 'temperature',
+      (d) =>
+          d.type == DeviceType.sensor &&
+          d.sensorType == 'temperature' &&
+          (user.role == UserRole.owner || user.assignedRoomIds.contains(d.roomId)),
     );
     return sensor.sensorValue;
   } catch (_) {

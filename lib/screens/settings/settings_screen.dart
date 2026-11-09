@@ -380,6 +380,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  void _showAssignRoomsDialog(
+    String memberId,
+    String memberName,
+    List<String> currentAssignedIds,
+  ) {
+    final allRooms = ref.read(roomsProvider);
+    final selectedRoomIds = List<String>.from(currentAssignedIds);
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  title: Text(
+                    'Assign Rooms: $memberName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child:
+                        allRooms.isEmpty
+                            ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                              child: Text('No rooms available in this house.'),
+                            )
+                            : ListView(
+                              shrinkWrap: true,
+                              children:
+                                  allRooms.map((room) {
+                                    final isAssigned = selectedRoomIds.contains(
+                                      room.id,
+                                    );
+                                    return CheckboxListTile(
+                                      value: isAssigned,
+                                      title: Text(room.name),
+                                      activeColor: const Color(0xFF6C5CE7),
+                                      onChanged: (bool? checked) {
+                                        setDialogState(() {
+                                          if (checked == true) {
+                                            selectedRoomIds.add(room.id);
+                                          } else {
+                                            selectedRoomIds.remove(room.id);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                            ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(memberId)
+                              .update({'assignedRoomIds': selectedRoomIds});
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Rooms updated for $memberName'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to update rooms: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
   /// Displays the Member Management dialog for the House Owner
   void _showManageMembersDialog(String houseId, String ownerId) {
     showDialog(
@@ -443,6 +545,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       final docId = members[index].id;
                       final isApproved = data['isApproved'] ?? false;
                       final memberName = data['name'] ?? 'Unknown User';
+                      final rawAssigned = data['assignedRoomIds'];
+                      final assignedRoomIds =
+                          rawAssigned is List
+                              ? rawAssigned.whereType<String>().toList()
+                              : <String>[];
 
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -467,26 +574,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 12,
                           ),
                         ),
-                        trailing: Switch(
-                          value: isApproved,
-                          activeColor: Colors.green,
-                          onChanged: (val) {
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(docId)
-                                .update({'isApproved': val});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  val
-                                      ? '$memberName Approved'
-                                      : '$memberName Access Revoked',
-                                ),
-                                backgroundColor:
-                                    val ? Colors.green : Colors.orange,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isApproved)
+                              IconButton(
+                                icon: const Icon(Icons.meeting_room_outlined),
+                                tooltip: 'Assign Rooms',
+                                onPressed:
+                                    () => _showAssignRoomsDialog(
+                                      docId,
+                                      memberName,
+                                      assignedRoomIds,
+                                    ),
                               ),
-                            );
-                          },
+                            Switch(
+                              value: isApproved,
+                              activeColor: Colors.green,
+                              onChanged: (val) {
+                                FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(docId)
+                                    .update({'isApproved': val});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      val
+                                          ? '$memberName Approved'
+                                          : '$memberName Access Revoked',
+                                    ),
+                                    backgroundColor:
+                                        val ? Colors.green : Colors.orange,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       );
                     },
