@@ -1,0 +1,98 @@
+[1/5] cmd.exe /C "cd /D "D:\Ahmed\SmartAssist-FYP\SmartAssist App\Smart-Assist\firmware\main_controller\idf_project\build\esp-idf\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\python_env\idf5.1_py3.13_env\Scripts\python.exe" "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/check_sizes.py" --offset 0x8000 partition --type app "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/partition_table/partition-table.bin" "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/smartassist_main_controller.bin""
+smartassist_main_controller.bin binary size 0x1772a0 bytes. Smallest app partition is 0x3e0000 bytes. 0x268d60 bytes (62%) free.
+[2/5] Performing build step for 'bootloader'
+[1/1] cmd.exe /C "cd /D "D:\Ahmed\SmartAssist-FYP\SmartAssist App\Smart-Assist\firmware\main_controller\idf_project\build\bootloader\esp-idf\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\python_env\idf5.1_py3.13_env\Scripts\python.exe" "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/partition_table/check_sizes.py" --offset 0x8000 bootloader 0x1000 "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/bootloader.bin""
+Bootloader binary size 0x6860 bytes. 0x7a0 bytes (7%) free.
+[2/3] cmd.exe /C "cd /D "C:\Users\LAPTOPS LOUNGE\esp\esp-idf-v5.1.4\components\esptool_py" && "C:\Users\LAPTOPS LOUNGE\.espressif\tools\cmake\3.24.0\bin\cmake.exe" -D "IDF_PATH=C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4" -D "SERIAL_TOOL=C:/Users/LAPTOPS LOUNGE/.espressif/python_env/idf5.1_py3.13_env/Scripts/python.exe;;C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esptool_py/esptool/esptool.py;--chip;esp32" -D SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args -D "WORKING_DIRECTORY=D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build" -P "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esptool_py/run_serial_tool.cmake""
+esptool.py --chip esp32 -p COM10 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 0x1000 bootloader/bootloader.bin 0x20000 smartassist_main_controller.bin 0x8000 partition_table/partition-table.bin
+esptool.py v4.13.0
+Serial port COM10
+Connecting..........
+Chip is ESP32-D0WD-V3 (revision v3.1)
+Features: WiFi, BT, Dual Core, 240MHz, VRef calibration in efuse, Coding Scheme None
+Crystal is 40MHz
+MAC: c8:85:41:c5:97:84
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00001000 to 0x00007fff...
+Flash will be erased from 0x00020000 to 0x00197fff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+SHA digest in image updated
+Compressed 26720 bytes to 16728...
+Writing at 0x00001000... (50 %)
+Writing at 0x000076a2... (100 %)
+Wrote 26720 bytes (16728 compressed) at 0x00001000 in 0.6 seconds (effective 357.7 kbit/s)...
+Hash of data verified.
+Compressed 1536672 bytes to 952847...
+Writing at 0x00020000... (1 %)
+Writing at 0x0002b3c3... (3 %)
+Writing at 0x0003a55b... (5 %)
+Writing at 0x0004752c... (6 %)
+Writing at 0x0004f70b... (8 %)
+Writing at 0x00054827... (10 %)
+Writing at 0x0005e4f3... (11 %)
+Writing at 0x0006bb8e... (13 %)
+Writing at 0x00071904... (15 %)
+Writing at 0x00077322... (16 %)
+Writing at 0x0007d2a4... (18 %)
+Writing at 0x00082fe6... (20 %)
+Writing at 0x00089275... (22 %)
+Writing at 0x0008f7c5... (23 %)
+Writing at 0x00095788... (25 %)
+Writing at 0x0009b841... (27 %)
+Writing at 0x000a1227... (28 %)
+Writing at 0x000a6b24... (30 %)
+Writing at 0x000ac7cf... (32 %)
+Writing at 0x000b25a0... (33 %)
+Writing at 0x000b8cdf... (35 %)
+Writing at 0x000be7fe... (37 %)
+Writing at 0x000c4c47... (38 %)
+Writing at 0x000ca857... (40 %)
+Writing at 0x000d0405... (42 %)
+Writing at 0x000d67f0... (44 %)
+Writing at 0x000dc4b3... (45 %)
+Writing at 0x000e1d29... (47 %)
+Writing at 0x000e751a... (49 %)
+Writing at 0x000ecc2c... (50 %)
+Writing at 0x000f2970... (52 %)
+Writing at 0x000f8316... (54 %)
+Writing at 0x000fdc0d... (55 %)
+Writing at 0x001036e9... (57 %)
+Writing at 0x00108f6a... (59 %)
+Writing at 0x0010ea30... (61 %)
+Writing at 0x001151ce... (62 %)
+Writing at 0x0011ad6e... (64 %)
+Writing at 0x0012031b... (66 %)
+Writing at 0x00125d16... (67 %)
+Writing at 0x0012af0f... (69 %)
+Writing at 0x00130418... (71 %)
+Writing at 0x00135781... (72 %)
+Writing at 0x0013aca8... (74 %)
+Writing at 0x001403b1... (76 %)
+Writing at 0x00145bc5... (77 %)
+Writing at 0x0014b9a6... (79 %)
+Writing at 0x001513cd... (81 %)
+Writing at 0x0015726f... (83 %)
+Writing at 0x0015d511... (84 %)
+Writing at 0x00162a64... (86 %)
+Writing at 0x0016b95b... (88 %)
+Writing at 0x001738a4... (89 %)
+Writing at 0x0017a482... (91 %)
+Writing at 0x001801a3... (93 %)
+Writing at 0x00185817... (94 %)
+Writing at 0x0018b37d... (96 %)
+Writing at 0x00190c9f... (98 %)
+Writing at 0x00196217... (100 %)
+Wrote 1536672 bytes (952847 compressed) at 0x00020000 in 22.8 seconds (effective 538.7 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 104...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (104 compressed) at 0x00008000 in 0.0 seconds (effective 797.8 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...

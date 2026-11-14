@@ -12,20 +12,52 @@ function privateKeyBytes(pem: string): Uint8Array {
   const binary = atob(body); return Uint8Array.from(binary, c => c.charCodeAt(0));
 }
 type UserInfo = { localId: string; disabled?: boolean; validSince?: string; customAttributes?: string };
+type FirebaseErrorBody = { error?: { code?: unknown; message?: unknown; status?: unknown } };
+
+function safeFirebaseErrorCode(body: FirebaseErrorBody): string | undefined {
+  const error = body.error;
+  for (const candidate of [error?.message, error?.status, error?.code]) {
+    if (typeof candidate === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(candidate)) return candidate;
+    if (typeof candidate === "number" && Number.isInteger(candidate)) return String(candidate);
+  }
+  return undefined;
+}
+
+async function firebaseErrorBody(response: Response): Promise<FirebaseErrorBody> {
+  try {
+    const body = await response.clone().json() as FirebaseErrorBody;
+    return body && typeof body === "object" ? body : {};
+  } catch { return {}; }
+}
 
 export class FirebaseAuthAdmin implements AuthAdmin {
-  constructor(private readonly env: Env, private readonly google: GoogleAdminAuth, private readonly fetcher: typeof fetch = fetch) {}
+  constructor(private readonly env: Env, private readonly google: GoogleAdminAuth, private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init)) {}
 
   async getUser(uid: string): Promise<FirebaseAccount | null> {
     const response = await this.call("accounts:lookup", { localId: [uid] });
-    if (response.status === 404) return null;
+    if (response.status === 404) {
+      const body = await firebaseErrorBody(response);
+      console.warn("firebase_auth_lookup_http_failed", { category: "user_not_found", status: response.status, ...(safeFirebaseErrorCode(body) ? { firebaseErrorCode: safeFirebaseErrorCode(body) } : {}) });
+      return null;
+    }
     if (!response.ok) {
-      const body = await response.clone().json().catch(() => ({})) as { error?: { message?: string } };
-      if (body.error?.message === "USER_NOT_FOUND") return null;
+      const body = await firebaseErrorBody(response);
+      const firebaseErrorCode = safeFirebaseErrorCode(body);
+      console.error("firebase_auth_lookup_http_failed", { category: "http_response", status: response.status, ...(firebaseErrorCode ? { firebaseErrorCode } : {}) });
+      if (firebaseErrorCode === "USER_NOT_FOUND") return null;
       throw apiUpstream(response.status, "Firebase Auth lookup failed.");
     }
-    const body = await response.json() as { users?: UserInfo[] };
+    let body: { users?: UserInfo[] };
+    try { body = await response.json() as { users?: UserInfo[] }; }
+    catch {
+      console.error("firebase_auth_lookup_response_invalid", { category: "invalid_json", status: response.status });
+      throw new ApiError("unavailable", "Firebase Auth lookup response could not be read.");
+    }
     const user = body.users?.[0];
+    if (!user || typeof user.localId !== "string") {
+      console.error("firebase_auth_lookup_response_invalid", { category: "invalid_response_shape", status: response.status });
+      return null;
+    }
     return user ? this.account(user) : null;
   }
 
@@ -70,10 +102,18 @@ export class FirebaseAuthAdmin implements AuthAdmin {
   }
   private async call(operation: string, body: Record<string, unknown>): Promise<Response> {
     const url = `https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(this.env.FIREBASE_PROJECT_ID)}/${operation}`;
+    let accessToken: string;
     try {
-      return await this.fetcher(url, { method: "POST", headers: { Authorization: `Bearer ${await this.google.accessToken()}`, "content-type": "application/json", ...(this.env.FIREBASE_WEB_API_KEY ? { "x-goog-api-key": this.env.FIREBASE_WEB_API_KEY } : {}) }, body: JSON.stringify(body) });
+      accessToken = await this.google.accessToken();
     } catch (error) {
-      if (error instanceof ApiError) throw error;
+      console.error("firebase_auth_request_failed", { operation, category: "oauth_token_acquisition", errorName: error instanceof Error ? error.name : "unknown", ...(error instanceof ApiError ? { errorCode: error.code, status: error.status } : {}) });
+      throw error;
+    }
+    try {
+      return await this.fetcher(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "content-type": "application/json", ...(this.env.FIREBASE_WEB_API_KEY ? { "x-goog-api-key": this.env.FIREBASE_WEB_API_KEY } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
+    } catch (error) {
+      const category = error instanceof Error && error.name === "AbortError" ? "timeout" : error instanceof TypeError ? "network" : "fetch_error";
+      console.error("firebase_auth_request_failed", { operation, category, errorName: error instanceof Error ? error.name : "unknown" });
       throw new ApiError("unavailable", "Firebase Auth is temporarily unavailable.");
     }
   }

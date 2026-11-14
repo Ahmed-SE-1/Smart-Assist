@@ -1273,6 +1273,7 @@
     "SECURE_FLASH_ENC_ENABLED": false,
     "SECURE_SIGNED_APPS_NO_SECURE_BOOT": false,
     "SMARTASSIST_DEVELOPMENT_MODE": true,
+    "SMARTASSIST_WORKER_BASE_URL": "https://smartassist-api.ahmedaliqurexhi7867.workers.dev",
     "SOC_ADC_ATTEN_NUM": 4,
     "SOC_ADC_DIGI_CONTROLLER_NUM": 2,
     "SOC_ADC_DIGI_DATA_BYTES_PER_CONV": 4,

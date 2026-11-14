@@ -1,0 +1,408 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:7112
+load:0x40078000,len:15624
+load:0x40080400,len:4
+load:0x40080404,len:3876
+entry 0x4008064c
+[0;32mI (29) boot: ESP-IDF v5.1.4 2nd stage bootloader[0m
+[0;32mI (29) boot: compile time Nov  9 2026 19:00:44[0m
+[0;32mI (29) boot: Multicore bootloader[0m
+[0;32mI (34) boot: chip revision: v3.1[0m
+[0;32mI (37) boot.esp32: SPI Speed      : 40MHz[0m
+[0;32mI (42) boot.esp32: SPI Mode       : DIO[0m
+[0;32mI (47) boot.esp32: SPI Flash Size : 4MB[0m
+[0;32mI (51) boot: Enabling RNG early entropy source...[0m
+[0;32mI (57) boot: Partition Table:[0m
+[0;32mI (60) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (67) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (75) boot:  1 nvs_keys         NVS keys         01 04 0000f000 00001000[0m
+[0;32mI (82) boot:  2 factory          factory app      00 00 00020000 003e0000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (94) esp_image: segment 0: paddr=00020020 vaddr=3f400020 size=4446ch (279660) map[0m
+[0;32mI (203) esp_image: segment 1: paddr=00064494 vaddr=3ffbdb60 size=059b0h ( 22960) load[0m
+[0;32mI (213) esp_image: segment 2: paddr=00069e4c vaddr=40080000 size=061cch ( 25036) load[0m
+[0;32mI (223) esp_image: segment 3: paddr=00070020 vaddr=400d0020 size=10f664h (1111652) map[0m
+[0;32mI (625) esp_image: segment 4: paddr=0017f68c vaddr=400861cc size=17c20h ( 97312) load[0m
+[0;32mI (681) boot: Loaded app from partition at offset 0x20000[0m
+[0;32mI (681) boot: Disabling RNG early entropy source...[0m
+[0;32mI (692) cpu_start: Multicore app[0m
+[0;32mI (693) cpu_start: Pro cpu up.[0m
+[0;32mI (693) cpu_start: Starting app cpu, entry point is 0x400814ec[0m
+[0;32mI (0) cpu_start: App cpu up.[0m
+[0;32mI (713) cpu_start: Pro cpu start user code[0m
+[0;32mI (713) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (713) cpu_start: Application information:[0m
+[0;32mI (718) cpu_start: Project name:     smartassist_main_controller[0m
+[0;32mI (724) cpu_start: App version:      e1b92a8-dirty[0m
+[0;32mI (730) cpu_start: Compile time:     Nov 13 2026 23:05:22[0m
+[0;32mI (736) cpu_start: ELF file SHA256:  bce58bebf83182be...[0m
+[0;32mI (742) cpu_start: ESP-IDF:          v5.1.4[0m
+[0;32mI (747) cpu_start: Min chip rev:     v0.0[0m
+[0;32mI (751) cpu_start: Max chip rev:     v3.99 [0m
+[0;32mI (756) cpu_start: Chip rev:         v3.1[0m
+[0;32mI (761) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (768) heap_init: At 3FFAFF10 len 000000F0 (0 KiB): DRAM[0m
+[0;32mI (774) heap_init: At 3FFB6388 len 00001C78 (7 KiB): DRAM[0m
+[0;32mI (780) heap_init: At 3FFB9A20 len 00004108 (16 KiB): DRAM[0m
+[0;32mI (786) heap_init: At 3FFCC520 len 00013AE0 (78 KiB): DRAM[0m
+[0;32mI (793) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[0;32mI (799) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[0;32mI (805) heap_init: At 4009DDEC len 00002214 (8 KiB): IRAM[0m
+[0;32mI (813) spi_flash: detected chip: generic[0m
+[0;32mI (816) spi_flash: flash io: dio[0m
+[0;32mI (822) coexist: coex firmware version: d96c1e51f[0m
+[0;32mI (826) app_start: Starting scheduler on CPU0[0m
+[0;32m[0;32mI (831) app_start: Starting scheduler on CPU1[0m
+[0;32mI (831) main_task: Started on CPU0[0m[0m
+[0;32mI (841) main_task: Calling app_main()[0m
+[0;33mW (881) smartassist-storage: DEVELOPMENT MODE: NVSI (892) wifi:wifi driver task: 3ffd4b68, prio:23, stack:6656, core=0
+[0;32mI (912) wifi:wifi firmware version: 3ce09e5[0m
+[0;32mI (912) wifi:wifi certification version: v7.0[0m
+[0;32mI (913) wifi:config NVS flash: enabled[0m
+[0;32mI (913) wifi:config nano formating: disabled[0m
+[0;32mI (917) wifi:Init data frame dynamic rx buffer num: 32[0m
+[0;32mI (922) wifi:Init static rx mgmt buffer num: 5[0m
+[0;32mI (926) wifi:Init management short buffer num: 32[0m
+[0;32mI (930) wifi:Init dynamic tx buffer num: 32[0m
+[0;32mI (934) wifi:Init static rx buffer size: 1600[0m
+[0;32mI (938) wifi:Init static rx buffer num: 4[0m
+[0;32mI (942) wifi:Init dynamic rx buffer num: 32[0m
+[0;32mI (947) wifi_init: rx ba win: 6[0m
+[0;32mI (949) wifi_init: tcpip mbox: 32[0m
+[0;32mI (953) wifi_init: udp mbox: 6[0m
+[0;32mI (957) wifi_init: tcp mbox: 6[0m
+[0;32mI (961) wifi_init: tcp tx win: 5760[0m
+[0;32mI (965) wifi_init: tcp rx win: 5760[0m
+[0;32mI (969) wifi_init: tcp mss: 1440[0m
+[0;32mI (973) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (977) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (986) phy_init: phy_version 4791,2c4672b,Dec 20 2023,16:06:06[0m
+[0;32mI (1079) wifi:mode : sta (c8:85:41:c5:97:84)[0m
+[0;32mI (1080) wifi:enable tsf[0m
+[0;32mI (1088) wifi:Set ps type: 0, coexist: 0[0m
+
+WiFi connection attempt started.
+[   283][E][Preferences.cpp:506] getString(): nvs_get_str len fail: house_id NOT_FOUND
+[0;32mI (1107) wifi:new:<2,0>, old:<1,0>, ap:<255,255>, sta:<2,0>, prof:1[0m
+[0;32mI (1109) wifi:state: init -> auth (b0)[0m
+[0;32mI (1118) wifi:state: auth -> assoc (0)[0m
+[   308][E][Preferences.cpp:506] getString(): nvs_get_str len fail: controller_id NOT_FOUND
+[0;32mI (1128) wifi:state: assoc -> run (10)[0m
+[0;32mI (1138) BTDM_INIT: BT controller compile version [1175e0a][0m
+[0;32mI (1141) BTDM_INIT: Bluetooth MAC: c8:85:41:c5:97:86[0m
+[0;32mI (1144) wifi:Coexist!!! Wi-Fi station would only keep waked when available[0m
+
+[0;32mI (1157) wifi:connected with OutsiderNotAllowed, aid = 16, channel 2, BW20, bssid = d0:ef:c1:d5:01:64[0m
+[0;32mI (1159) wifi:security: WPA2-PSK, phy: bgn, rssi: -49[0m
+[0;32mI (1184) wifi:pm start, type: 0[0m
+
+[0;32mI (1184) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us[0m
+[0;32mI (1217) wifi:AP's beacon interval = 102400 us, DTIM period = 1[0m
+[0;33mW (1691) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+Main Controller BLE pairing service ready.
+[0;32mI (4408) esp_netif_handlers: sta ip: 192.168.100.232, mask: 255.255.255.0, gw: 192.168.100.1[0m
+WiFi connected.
+192.168.100.232
+WiFi channel: 2
+[0;32mI (4423) ESPNOW: espnow [version: 1.0] init[0m
+NODE 1 added successfully!
+NODE 2 added successfully!
+ESP-NOW READY!
+[0;32mI (24380) wifi:<ba-add>idx:0 (ifx:0, d0:ef:c1:d5:01:64), tid:0, ssn:11, winSize:64[0m
+����������������������������������������������������������������pairing request received and validated.
+BLE pairing request enqueued.
+Worker claim request started.
+[ 77979][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[ 77994][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[ 78005][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 78014][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+[0;33mW (80101) BT_HCI: hcif disc complete: hdl 0x0, rsn 0x13[0m
+[0;33mW (80111) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+Worker claim request started.
+[ 84399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 84409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 84420][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 87925][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[ 87940][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[ 87954][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 87963][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 94399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 94409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 94418][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 97937][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[ 97952][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[ 97963][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 97972][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[104399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[104409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[104417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[107888][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[107903][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[107914][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[107923][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+����������������������������������������������������������������orker claim request started.
+[114399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[114409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[114417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[0;32mI (115296) wifi:<ba-add>idx:1 (ifx:0, d0:ef:c1:d5:01:64), tid:5, ssn:6, winSize:64[0m
+[117992][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[118008][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[118019][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[118028][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+BLE pairing request received and validated.
+BLE pairing request enqueued.
+Worker claim request started.
+[124399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[124409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[124418][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[127960][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[127975][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[127986][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[128000][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+[0;33mW (130049) BT_HCI: hcif disc complete: hdl 0x0, rsn 0x13[0m
+[0;33mW (130056) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+Worker claim request started.
+[134399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[134409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[134417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[137903][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[137918][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[137932][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[137941][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[144399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[144409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[144419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[147929][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[147944][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[147960][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[147969][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[154399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[154409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[154418][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[157937][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[157952][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[157965][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[157974][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[164399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[164409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[164417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[167960][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[167977][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[167989][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[167997][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[174399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[174409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[174417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[178007][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[178022][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[178034][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[178042][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[184399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[184412][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[184421][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[187939][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[187954][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[187966][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[187974][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[194399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[194409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[194417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[197912][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[197929][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[197941][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[197950][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[204399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[204409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[204417][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[207936][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[207951][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[207970][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[207980][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[214399][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[214409][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[214418][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[217954][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[217969][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[217980][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[217989][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[224400][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[224410][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[224419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[227907][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[227922][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[227936][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[227945][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[234400][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[234410][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[234418][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[237931][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[237946][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[237957][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[237967][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[244401][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[244410][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[244419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[247938][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[247953][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[247964][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[247973][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[254403][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[254412][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[254421][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[257904][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[257919][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[257935][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[257944][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[264401][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[264411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[264419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[267925][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[267940][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[267951][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[267960][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[274402][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[274411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[274421][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[277944][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[277959][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[277970][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[277979][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[284402][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[284412][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[284421][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[287906][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[287921][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[287936][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[287945][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[294401][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[294411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[294419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[297940][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[297955][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[297966][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[297977][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[304401][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[304411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[304423][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[307922][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[307937][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[307950][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[307958][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[314402][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[314411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[314420][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[317918][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[317933][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[317947][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[317956][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[324401][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[324411][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[324419][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[327927][E][ssl_client.cpp:36] _handle_error(): [ssl_starttls_handshake():313]: (-9984) X509 - Certificate verification failed, e.g. CRL, CA or signature check failed
+[327942][E][NetworkClientSecure.cpp:159] connect(): start_ssl_client: connect failed: -9984
+[327953][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[327961][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-1).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.

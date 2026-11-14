@@ -23,8 +23,8 @@ CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=D:/Ahmed/SmartAssist-FYP/SmartAssist App
 //Install path prefix, prepended onto install directories.
 CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/pubsubclient-populate
 
-//No help, variable specified on the command line.
-CMAKE_MAKE_PROGRAM:FILEPATH=C:/Users/LAPTOP~1/ESPRES~1/tools/ninja/110~1.2/ninja.exe
+//make program
+CMAKE_MAKE_PROGRAM:FILEPATH=C:/Users/LAPTOPS LOUNGE/.espressif/tools/ninja/1.10.2/ninja.exe
 
 //Value Computed by CMake
 CMAKE_PROJECT_DESCRIPTION:STATIC=

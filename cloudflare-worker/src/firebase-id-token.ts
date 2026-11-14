@@ -7,10 +7,12 @@ const MAX_CERT_CACHE_MS = 24 * 60 * 60 * 1000;
 
 interface CachedCerts {
   expiresAt: number;
+  staleUntil: number;
   keys: Record<string, string>;
 }
 
 let certCache: CachedCerts | undefined;
+let certFetch: Promise<Record<string, string>> | undefined;
 
 function decodeBase64Url(value: string): Uint8Array {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -32,10 +34,38 @@ function maxAgeMilliseconds(cacheControl: string | null): number {
   return Math.min(MAX_CERT_CACHE_MS, Math.max(0, seconds * 1000));
 }
 
+function safeErrorText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, "[REDACTED]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+    .replace(/\b[A-Za-z0-9_-]{40,}\b/g, "[REDACTED]")
+    .replace(/(token|secret|password|private[_ -]?key|authorization)(\s*[:=]\s*)[^\s,;]+/gi, "$1$2[REDACTED]")
+    .slice(0, 180);
+}
+
+function certDiagnostic(error: unknown): Record<string, string> {
+  const err = error instanceof Error ? error : undefined;
+  const cause = err?.cause instanceof Error ? err.cause : undefined;
+  const message = safeErrorText(err?.message ?? String(error));
+  const causeMessage = safeErrorText(cause?.message);
+  const details = `${err?.name ?? "Unknown"} ${message} ${cause?.name ?? ""} ${causeMessage}`.toLowerCase();
+  const category = /abort|timeout|timed out/.test(details) ? "timeout"
+    : /tls|ssl|certificate|handshake/.test(details) ? "tls_or_connection"
+      : /dns|resolve|network|fetch failed|connection|socket/.test(details) ? "network"
+        : "fetch_error";
+  return {
+    category,
+    errorName: err?.name ?? "Unknown",
+    ...(message ? { errorMessage: message } : {}),
+    ...(cause ? { causeName: cause.name, ...(causeMessage ? { causeMessage } : {}) } : {}),
+  };
+}
+
 export class FirebaseIdTokenVerifier implements IdTokenVerifier {
   constructor(
     private readonly projectId: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init),
     private readonly nowSeconds: () => number = () => Math.floor(Date.now() / 1000),
   ) {}
 
@@ -88,25 +118,71 @@ export class FirebaseIdTokenVerifier implements IdTokenVerifier {
     return claims;
   }
 
+
   private async getCerts(force = false): Promise<Record<string, string>> {
-    if (!force && certCache && certCache.expiresAt > Date.now()) return certCache.keys;
+    if (!force && certCache && certCache.expiresAt > Date.now()) {
+      return certCache.keys;
+    }
+
+    if (certFetch) return certFetch;
+    certFetch = this.fetchCerts();
+    try { return await certFetch; }
+    finally { certFetch = undefined; }
+  }
+
+  private async fetchCerts(): Promise<Record<string, string>> {
+
     let response: Response;
+
     try {
-      response = await this.fetcher(CERT_URL, { headers: { Accept: "application/json" } });
-    } catch {
+      response = await this.fetcher(CERT_URL, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8_000),
+      });
+    } catch (error) {
+      console.error("firebase_cert_fetch_failed", certDiagnostic(error));
+      if (certCache && certCache.staleUntil > Date.now()) return certCache.keys;
       throw new ApiError("unavailable", "Firebase signing keys are temporarily unavailable.");
     }
-    if (!response.ok) throw new ApiError("unavailable", "Firebase signing keys are temporarily unavailable.");
-    const keys = await response.json() as Record<string, string>;
-    if (!keys || typeof keys !== "object" || Array.isArray(keys)) {
+
+    if (!response.ok) {
+      console.error("firebase_cert_http_failed", { status: response.status, category: "http" });
+      if (certCache && certCache.staleUntil > Date.now()) return certCache.keys;
+      throw new ApiError("unavailable", "Firebase signing keys are temporarily unavailable.");
+    }
+
+    let keys: Record<string, string>;
+
+    try {
+      keys = await response.json() as Record<string, string>;
+    } catch {
+      console.error("firebase_cert_response_invalid", { category: "invalid_json" });
+      if (certCache && certCache.staleUntil > Date.now()) return certCache.keys;
       throw new ApiError("unavailable", "Firebase signing keys could not be read.");
     }
+
+    if (!keys || typeof keys !== "object" || Array.isArray(keys) || Object.keys(keys).length === 0 ||
+      Object.values(keys).some(value => typeof value !== "string" || !/-----BEGIN (?:CERTIFICATE|PUBLIC KEY)-----/.test(value))) {
+      console.error("firebase_cert_response_invalid", { category: "malformed_certificates" });
+      if (certCache && certCache.staleUntil > Date.now()) return certCache.keys;
+      throw new ApiError("unavailable", "Firebase signing keys could not be read.");
+    }
+
     const maxAge = maxAgeMilliseconds(response.headers.get("cache-control"));
-    certCache = { keys, expiresAt: Date.now() + maxAge };
+    const now = Date.now();
+    certCache = {
+      keys,
+      expiresAt: now + maxAge,
+      staleUntil: now + maxAge + 5 * 60 * 1000,
+    };
+
     return keys;
   }
+
 }
 
 export function clearFirebaseCertCacheForTests(): void {
   certCache = undefined;
+  certFetch = undefined;
 }

@@ -1,0 +1,222 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:7112
+load:0x40078000,len:15624
+load:0x40080400,len:4
+load:0x40080404,len:3876
+entry 0x4008064c
+[0;32mI (29) boot: ESP-IDF v5.1.4 2nd stage bootloader[0m
+[0;32mI (29) boot: compile time Nov  9 2026 19:00:44[0m
+[0;32mI (29) boot: Multicore bootloader[0m
+[0;32mI (34) boot: chip revision: v3.1[0m
+[0;32mI (37) boot.esp32: SPI Speed      : 40MHz[0m
+[0;32mI (42) boot.esp32: SPI Mode       : DIO[0m
+[0;32mI (47) boot.esp32: SPI Flash Size : 4MB[0m
+[0;32mI (51) boot: Enabling RNG early entropy source...[0m
+[0;32mI (57) boot: Partition Table:[0m
+[0;32mI (60) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (67) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (75) boot:  1 nvs_keys         NVS keys         01 04 0000f000 00001000[0m
+[0;32mI (82) boot:  2 factory          factory app      00 00 00020000 003e0000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (94) esp_image: segment 0: paddr=00020020 vaddr=3f400020 size=44ca4h (281764) map[0m
+[0;32mI (204) esp_image: segment 1: paddr=00064ccc vaddr=3ffbdb60 size=059b0h ( 22960) load[0m
+[0;32mI (213) esp_image: segment 2: paddr=0006a684 vaddr=40080000 size=05994h ( 22932) load[0m
+[0;32mI (223) esp_image: segment 3: paddr=00070020 vaddr=400d0020 size=10f7e4h (1112036) map[0m
+[0;32mI (625) esp_image: segment 4: paddr=0017f80c vaddr=40085994 size=18458h ( 99416) load[0m
+[0;32mI (682) boot: Loaded app from partition at offset 0x20000[0m
+[0;32mI (682) boot: Disabling RNG early entropy source...[0m
+[0;32mI (693) cpu_start: Multicore app[0m
+[0;32mI (694) cpu_start: Pro cpu up.[0m
+[0;32mI (694) cpu_start: Starting app cpu, entry point is 0x400814ec[0m
+[0;32mI (0) cpu_start: App cpu up.[0m
+[0;32mI (714) cpu_start: Pro cpu start user code[0m
+[0;32mI (714) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (714) cpu_start: Application information:[0m
+[0;32mI (718) cpu_start: Project name:     smartassist_main_controller[0m
+[0;32mI (725) cpu_start: App version:      e1b92a8-dirty[0m
+[0;32mI (731) cpu_start: Compile time:     Nov 13 2026 23:05:22[0m
+[0;32mI (737) cpu_start: ELF file SHA256:  3ccb88b93910e5f3...[0m
+[0;32mI (743) cpu_start: ESP-IDF:          v5.1.4[0m
+[0;32mI (748) cpu_start: Min chip rev:     v0.0[0m
+[0;32mI (752) cpu_start: Max chip rev:     v3.99 [0m
+[0;32mI (757) cpu_start: Chip rev:         v3.1[0m
+[0;32mI (762) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (769) heap_init: At 3FFAFF10 len 000000F0 (0 KiB): DRAM[0m
+[0;32mI (775) heap_init: At 3FFB6388 len 00001C78 (7 KiB): DRAM[0m
+[0;32mI (781) heap_init: At 3FFB9A20 len 00004108 (16 KiB): DRAM[0m
+[0;32mI (787) heap_init: At 3FFCC588 len 00013A78 (78 KiB): DRAM[0m
+[0;32mI (793) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[0;32mI (800) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[0;32mI (806) heap_init: At 4009DDEC len 00002214 (8 KiB): IRAM[0m
+[0;32mI (814) spi_flash: detected chip: generic[0m
+[0;32mI (817) spi_flash: flash io: dio[0m
+[0;32mI (823) coexist: coex firmware version: d96c1e51f[0m
+[0;32mI (827) app_start: Starting scheduler on CPU0[0m
+[0;32m[0;32mI (831) app_start: Starting scheduler on CPU1[0m
+[0;32mI (831) main_task: Started on CPU0[0m[0m
+[0;32mI (841) main_task: Calling app_main()[0m
+[0;33mW (881) smartassist-storage: DEVELOPMENT MODE: NVSI (892) wifi:wifi driver task: 3ffd52e0, prio:23, stack:6656, core=0
+[0;32mI (911) wifi:wifi firmware version: 3ce09e5[0m
+[0;32mI (912) wifi:wifi certification version: v7.0[0m
+[0;32mI (912) wifi:config NVS flash: enabled[0m
+[0;32mI (912) wifi:config nano formating: disabled[0m
+[0;32mI (916) wifi:Init data frame dynamic rx buffer num: 32[0m
+[0;32mI (921) wifi:Init static rx mgmt buffer num: 5[0m
+[0;32mI (925) wifi:Init management short buffer num: 32[0m
+[0;32mI (929) wifi:Init dynamic tx buffer num: 32[0m
+[0;32mI (933) wifi:Init static rx buffer size: 1600[0m
+[0;32mI (937) wifi:Init static rx buffer num: 4[0m
+[0;32mI (941) wifi:Init dynamic rx buffer num: 32[0m
+[0;32mI (946) wifi_init: rx ba win: 6[0m
+[0;32mI (949) wifi_init: tcpip mbox: 32[0m
+[0;32mI (953) wifi_init: udp mbox: 6[0m
+[0;32mI (956) wifi_init: tcp mbox: 6[0m
+[0;32mI (960) wifi_init: tcp tx win: 5760[0m
+[0;32mI (964) wifi_init: tcp rx win: 5760[0m
+[0;32mI (968) wifi_init: tcp mss: 1440[0m
+[0;32mI (972) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (977) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (986) phy_init: phy_version 4791,2c4672b,Dec 20 2023,16:06:06[0m
+[0;32mI (1074) wifi:mode : sta (c8:85:41:c5:97:84)[0m
+[0;32mI (1076) wifi:enable tsf[0m
+[0;32mI (1083) wifi:Set ps type: 0, coexist: 0[0m
+
+WiFi connection attempt started.
+[   279][E][Preferences.cpp:506] getString(): nvs_get_str len fail: house_id NOT_FOUND
+[0;32mI (1102) wifi:new:<2,0>, old:<1,0>, ap:<255,255>, sta:<2,0>, prof:1[0m
+[0;32mI (1104) wifi:state: init -> auth (b0)[0m
+[0;32mI (1107) wifi:state: auth -> assoc (0)[0m
+[   304][E][Preferences.cpp:506] getString(): nvs_get_str len fail: controller_id NOT_FOUND
+[0;32mI (1118) wifi:state: assoc -> run (10)[0m
+[0;32mI (1130) BTDM_INIT: BT controller compile version [1175e0a][0m
+[0;32mI (1132) BTDM_INIT: Bluetooth MAC: c8:85:41:c5:97:86[0m
+[0;32mI (1139) wifi:Coexist!!! Wi-Fi station would only keep waked when available[0m
+
+[0;32mI (1140) wifi:connected with OutsiderNotAllowed, aid = 17, channel 2, BW20, bssid = d0:ef:c1:d5:01:64[0m
+[0;32mI (1147) wifi:security: WPA2-PSK, phy: bgn, rssi: -38[0m
+[0;32mI (1157) wifi:pm start, type: 0[0m
+
+[0;32mI (1157) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us[0m
+[0;32mI (1225) wifi:AP's beacon interval = 102400 us, DTIM period = 1[0m
+Main Controller BLE pairing service ready.
+[0;33mW (1690) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+[0;32mI (4170) esp_netif_handlers: sta ip: 192.168.100.232, mask: 255.255.255.0, gw: 192.168.100.1[0m
+WiFi connected.
+192.168.100.232
+WiFi channel: 2
+[0;32mI (4176) ESPNOW: espnow [version: 1.0] init[0m
+NODE 1 added successfully!
+NODE 2 added successfully!
+ESP-NOW READY!
+[0;32mI (28192) wifi:<ba-add>idx:0 (ifx:0, d0:ef:c1:d5:01:64), tid:0, ssn:44, winSize:64[0m
+BLE pairing request received and validated.
+BLE pairing request enqueued.
+Worker claim request started.
+HTTPS transport diagnostic code: 54.
+[ 49227][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 49269][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 49279][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 49287][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[0;33mW (51336) BT_HCI: hcif disc complete: hdl 0x0, rsn 0x13[0m
+[0;33mW (51345) BT_BTM: BTM_BleWriteScanRsp, Partial data write into ADV[0m
+HTTPS transport diagnostic code: 54.
+[ 61791][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 61820][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 61830][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 61839][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[ 74284][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 74313][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 74323][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 74331][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[ 86807][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 86844][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 86853][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 86862][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[0;32mI (87756) wifi:<ba-add>idx:1 (ifx:0, d0:ef:c1:d5:01:64), tid:5, ssn:8, winSize:64[0m
+HTTPS transport diagnostic code: 54.
+[ 99309][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[ 99338][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 99348][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[ 99357][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[111875][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[111903][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[111913][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[111923][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[124397][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[124425][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[124436][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[124445][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[136982][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[137019][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[137028][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[137037][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[149547][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[149574][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[149585][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[149594][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+HTTPS transport diagnostic code: 54.
+[162450][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+Worker HTTP request failed (-11).
+Worker HTTPS transport failed before an HTTP response (TLS/network).
+Worker claim HTTP result: failure.
+Pairing failed: Worker claim was not accepted.
+Worker claim request started.
+[162479][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[162490][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"
+[162499][E][NetworkClient.cpp:319] setSocketOption(): fail on 0, errno: 9, "Bad file number"

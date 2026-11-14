@@ -41,7 +41,7 @@ function refName(projectId: string, ref: Ref): string {
 
 export class FirestoreRestStore implements PairingStore {
   private readonly root: string;
-  constructor(private readonly projectId: string, private readonly auth: GoogleAdminAuth, private readonly fetcher: typeof fetch = fetch) {
+  constructor(private readonly projectId: string, private readonly auth: GoogleAdminAuth, private readonly fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init)) {
     this.root = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
   }
   doc(collection: string, id: string): object { return { collection, id } satisfies Ref; }
@@ -51,13 +51,13 @@ export class FirestoreRestStore implements PairingStore {
     const response = await this.request(`${this.root}/${collection}/${encodeURIComponent(id)}`);
     if (response.status === 404) return undefined;
     if (!response.ok) throw await firestoreError(response);
-    return decodeFields(((await response.json()) as Value).fields as Record<string, Value>);
+    return decodeFields(((await firestoreJson(response)) as Value).fields as Record<string, Value>);
   }
 
   async query(collection: string, structuredQuery: Record<string, unknown>): Promise<Array<{ id: string; data: Value }>> {
     const response = await this.request(`${this.root}:runQuery`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ structuredQuery: { ...structuredQuery, from: [{ collectionId: collection }] } }) });
     if (!response.ok) throw await firestoreError(response);
-    const rows = await response.json() as Array<{ document?: { name: string; fields?: Record<string, Value> } }>;
+    const rows = await firestoreJson(response) as Array<{ document?: { name: string; fields?: Record<string, Value> } }>;
     return rows.flatMap(row => row.document ? [{ id: row.document.name.split("/").pop()!, data: decodeFields(row.document.fields) }] : []);
   }
 
@@ -65,7 +65,7 @@ export class FirestoreRestStore implements PairingStore {
     for (let attempt = 0; attempt < 5; attempt++) {
       const begin = await this.request(`${this.root}:beginTransaction`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ options: { readWrite: {} } }) });
       if (!begin.ok) throw await firestoreError(begin);
-      const transactionId = String(((await begin.json()) as Value).transaction);
+      const transactionId = String(((await firestoreJson(begin) as Value).transaction));
       const writes: Write[] = [];
       const tx: PairingTransaction = {
         get: async raw => {
@@ -73,7 +73,7 @@ export class FirestoreRestStore implements PairingStore {
           const response = await this.request(`${this.root}/${ref.collection}/${encodeURIComponent(ref.id)}?transaction=${encodeURIComponent(transactionId)}`);
           if (response.status === 404) return snapshot(false);
           if (!response.ok) throw await firestoreError(response);
-          const data = await response.json() as { fields?: Record<string, Value> };
+          const data = await firestoreJson(response) as { fields?: Record<string, Value> };
           return snapshot(true, decodeFields(data.fields));
         },
         create: (raw, data) => {
@@ -110,10 +110,18 @@ export class FirestoreRestStore implements PairingStore {
   }
 
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
+    let accessToken: string;
+    try {
+      accessToken = await this.auth.accessToken();
+    } catch (error) {
+      console.error("firestore_request_failed", { category: "oauth_token_acquisition", errorName: error instanceof Error ? error.name : "unknown" });
+      throw error;
+    }
     let response: Response;
     try {
-      response = await this.fetcher(url, { ...init, headers: { ...(init.headers ?? {}), Authorization: `Bearer ${await this.auth.accessToken()}` } });
-    } catch {
+      response = await this.fetcher(url, { ...init, headers: { ...(init.headers ?? {}), Authorization: `Bearer ${accessToken}` }, signal: init.signal ?? AbortSignal.timeout(10_000) });
+    } catch (error) {
+      console.error("firestore_request_failed", { category: error instanceof Error && error.name === "AbortError" ? "timeout" : error instanceof TypeError ? "network" : "fetch_error" });
       throw new ApiError("unavailable", "Firestore is temporarily unavailable.");
     }
     return response;
@@ -128,6 +136,51 @@ function snapshot(exists: boolean, data?: Value): PairingSnapshot { return { exi
 const ABORTED = 409;
 async function firestoreError(response: Response): Promise<ApiError> {
   const status = response.status;
+  const body = await response.clone().json().catch(() => undefined) as GoogleErrorBody | undefined;
+  const upstream = body?.error;
+  const messageCategory = classifyGoogleMessage(upstream?.message);
+  const statusCategory = status === 401 ? "unauthorized" : status === 403 ? "permission_denied" : status === 404 ? "not_found" : status === 429 ? "rate_limited" : status >= 500 ? "upstream_server" : "http_error";
+  const details = Array.isArray(upstream?.details) ? upstream.details : [];
+  const errorInfo = details.filter(isRecord).map(detail => ({
+    ...(safeDiagnosticCode(detail.reason) ? { reason: safeDiagnosticCode(detail.reason) } : {}),
+    ...(safeDiagnosticDomain(detail.domain) ? { domain: safeDiagnosticDomain(detail.domain) } : {}),
+  })).filter(detail => detail.reason || detail.domain).slice(0, 3);
+  console.error("firestore_http_failed", {
+    status,
+    category: statusCategory,
+    ...(safeDiagnosticCode(upstream?.status) ? { googleStatus: safeDiagnosticCode(upstream?.status) } : {}),
+    ...(typeof upstream?.code === "number" && Number.isInteger(upstream.code) ? { googleCode: upstream.code } : {}),
+    ...(messageCategory ? { messageCategory } : {}),
+    ...(errorInfo.length ? { errorInfo } : {}),
+    ...(!body ? { errorBodyCategory: "invalid_or_unavailable_json" } : {}),
+  });
   // Never forward raw upstream response bodies; they can contain request details.
   return new ApiError(status === 404 ? "not-found" : status === 403 ? "permission-denied" : status === 409 ? "unavailable" : status >= 500 ? "unavailable" : "internal", "Firestore request failed.");
+}
+
+interface GoogleErrorBody { error?: { code?: unknown; message?: unknown; status?: unknown; details?: unknown }; }
+function isRecord(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function safeDiagnosticCode(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : undefined;
+}
+function safeDiagnosticDomain(value: unknown): string | undefined {
+  return typeof value === "string" && /^[a-z0-9.-]{1,100}$/i.test(value) ? value : undefined;
+}
+function classifyGoogleMessage(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const message = value.toLowerCase();
+  if (message.includes("permission") || message.includes("denied")) return "permission_denied";
+  if (message.includes("unauthenticated") || message.includes("credential") || message.includes("token")) return "authentication";
+  if (message.includes("quota") || message.includes("rate limit")) return "quota_or_rate_limit";
+  if (message.includes("not found")) return "not_found";
+  if (message.includes("invalid") || message.includes("malformed")) return "invalid_request";
+  return "other";
+}
+
+async function firestoreJson(response: Response): Promise<unknown> {
+  try { return await response.json(); }
+  catch {
+    console.error("firestore_response_invalid", { category: "invalid_json", status: response.status });
+    throw new ApiError("unavailable", "Firestore is temporarily unavailable.");
+  }
 }

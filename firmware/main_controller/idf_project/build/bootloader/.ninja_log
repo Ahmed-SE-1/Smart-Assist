@@ -48,7 +48,7 @@
 2257	3785	8159360403105300	esp-idf/hal/CMakeFiles/__idf_hal.dir/wdt_hal_iram.c.obj	b770894a9d2d08f
 2648	3825	8159360403173669	esp-idf/soc/CMakeFiles/__idf_soc.dir/esp32/rtc_io_periph.c.obj	94c084f029b23062
 3053	4345	8159360408187735	esp-idf/soc/CMakeFiles/__idf_soc.dir/esp32/sdio_slave_periph.c.obj	e6bc6ecaf9ddaa5c
-13	283	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	134	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
 3745	5714	8159360422247278	esp-idf/bootloader_support/CMakeFiles/__idf_bootloader_support.dir/src/bootloader_common.c.obj	4c2b1409ccf65fd1
 3094	4554	8159360410378503	esp-idf/spi_flash/CMakeFiles/__idf_spi_flash.dir/spi_flash_wrap.c.obj	846738a57e47541
 4347	5979	8159360425302765	esp-idf/bootloader_support/CMakeFiles/__idf_bootloader_support.dir/src/bootloader_common_loader.c.obj	c0b3986c783c2567
@@ -105,20 +105,30 @@
 17622	18572	8159360551374239	bootloader.elf	e65f09d1aebd4922
 18574	24844	8159360612316820	.bin_timestamp	8916a23b208a7b3b
 18574	24844	8159360612316820	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/.bin_timestamp	8916a23b208a7b3b
-13	283	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-7	180737	8159449575935214	build.ninja	14a69e493cd62e03
-3	126870	8159449575935214	build.ninja	14a69e493cd62e03
-26	3234	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-26	3234	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-12	204	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-12	204	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-18	291	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-18	291	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-13	318	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-13	318	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-29	691	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-29	691	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-16	304	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-16	304	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-23	306	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
-23	306	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	134	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+3	56700	8162963547837962	build.ninja	14a69e493cd62e03
+4	65709	8162963547837962	build.ninja	14a69e493cd62e03
+29	938	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+29	938	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+64	730	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+64	730	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	157	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	157	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	142	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	142	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	156	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	156	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+11	178	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+11	178	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+12	228	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+12	228	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	208	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	208	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	143	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+8	143	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+10	179	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+10	179	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	143	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+7	143	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+11	1223	0	esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6
+11	1223	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/bootloader/esp-idf/esptool_py/CMakeFiles/bootloader_check_size	ab537811dce68aa6

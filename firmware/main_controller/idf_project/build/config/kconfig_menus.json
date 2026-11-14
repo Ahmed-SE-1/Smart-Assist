@@ -4478,6 +4478,16 @@
                 "range": null,
                 "title": "Require encrypted NVS (production)",
                 "type": "bool"
+            },
+            {
+                "children": [],
+                "depends_on": null,
+                "help": "Set to the verified deployed Worker origin, for example\nhttps://<verified-worker-host>.workers.dev. Leave empty until the\nactual Cloudflare account and workers.dev hostname are configured.",
+                "id": "SMARTASSIST_WORKER_BASE_URL",
+                "name": "SMARTASSIST_WORKER_BASE_URL",
+                "range": null,
+                "title": "SmartAssist Worker HTTPS base URL",
+                "type": "string"
             }
         ],
         "depends_on": null,

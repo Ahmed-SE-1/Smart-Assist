@@ -10,6 +10,7 @@ import { FirebaseAuthAdmin } from "../src/firebase-auth-admin.ts";
 import { UnconfiguredMqttTransport } from "../src/mqtt-adapter.ts";
 import { deliverUnpairOperation } from "../src/unpair-delivery.ts";
 import { FirestoreRestStore } from "../src/firestore-rest.ts";
+import { GoogleAdminAuth } from "../src/google-auth.ts";
 
 const now = Math.floor(Date.now() / 1000);
 const project = "smartassist-18d2a";
@@ -48,6 +49,151 @@ test("Firebase signing keys are cached and refreshed after unknown kid", async (
   const verify = new FirebaseIdTokenVerifier(project, async () => { reads++; return new Response(JSON.stringify({ "test-key": pem }), { headers: { "cache-control": "public, max-age=3600" } }); }, () => now);
   await verify.verify(token()); await verify.verify(token());
   assert.equal(reads, 1);
+});
+
+test("Firebase certificate fetch failures are generic and logged without upstream text", async () => {
+  clearFirebaseCertCacheForTests();
+  const original = console.error; const logs: unknown[][] = []; console.error = (...args: unknown[]) => { logs.push(args); };
+  try {
+    const secretLike = "s".repeat(48);
+    const network = new FirebaseIdTokenVerifier(project, async () => { throw new TypeError(`network ${secretLike}`); });
+    await assert.rejects(network.verify(token()), (error: unknown) => error instanceof ApiError && error.message === "Firebase signing keys are temporarily unavailable.");
+    clearFirebaseCertCacheForTests();
+    const http = new FirebaseIdTokenVerifier(project, async () => new Response("sensitive body", { status: 503 }));
+    await assert.rejects(http.verify(token()), ApiError);
+    clearFirebaseCertCacheForTests();
+    const malformed = new FirebaseIdTokenVerifier(project, async () => new Response("not-json"));
+    await assert.rejects(malformed.verify(token()), ApiError);
+    assert.equal(JSON.stringify(logs).includes(secretLike), false);
+    assert.equal(JSON.stringify(logs).includes("sensitive body"), false);
+  } finally { console.error = original; clearFirebaseCertCacheForTests(); }
+});
+
+test("Firebase certificate cache expires and refreshes", async () => {
+  clearFirebaseCertCacheForTests(); let reads = 0;
+  const verify = new FirebaseIdTokenVerifier(project, async () => { reads++; return new Response(JSON.stringify({ "test-key": pem }), { headers: { "cache-control": "public, max-age=1" } }); }, () => now);
+  await verify.verify(token()); await verify.verify(token()); assert.equal(reads, 1);
+  await new Promise(resolve => setTimeout(resolve, 1100)); await verify.verify(token()); assert.equal(reads, 2);
+});
+
+test("Firebase certificates use bounded stale fallback and coalesce concurrent fetches", async () => {
+  clearFirebaseCertCacheForTests(); let reads = 0;
+  const cached = new FirebaseIdTokenVerifier(project, async () => { reads++; return new Response(JSON.stringify({ "test-key": pem }), { headers: { "cache-control": "max-age=0" } }); }, () => now);
+  await cached.verify(token());
+  const unavailable = new FirebaseIdTokenVerifier(project, async () => { throw new TypeError("network unavailable"); }, () => now);
+  assert.equal((await unavailable.verify(token())).sub, "owner-1");
+  clearFirebaseCertCacheForTests(); reads = 0;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const concurrent = new FirebaseIdTokenVerifier(project, async () => { reads++; await gate; return new Response(JSON.stringify({ "test-key": pem }), { headers: { "cache-control": "max-age=3600" } }); }, () => now);
+  const first = concurrent.verify(token()); const second = concurrent.verify(token());
+  await Promise.resolve(); release(); await Promise.all([first, second]);
+  assert.equal(reads, 1);
+  clearFirebaseCertCacheForTests();
+});
+
+test("Firebase certificate timeout is classified without logging the thrown message", async () => {
+  clearFirebaseCertCacheForTests();
+  const original = console.error; const logs: unknown[][] = []; console.error = (...args: unknown[]) => { logs.push(args); };
+  try {
+    const secretLike = "t".repeat(48);
+    const verifier = new FirebaseIdTokenVerifier(project, async () => { const error = new Error(`timeout ${secretLike}`); error.name = "AbortError"; throw error; });
+    await assert.rejects(verifier.verify(token()), ApiError);
+    assert.match(JSON.stringify(logs), /timeout/);
+    assert.equal(JSON.stringify(logs).includes(secretLike), false);
+  } finally { console.error = original; }
+});
+
+test("default fetch wrappers preserve the native global receiver across certificate, OAuth, and Firestore calls", async () => {
+  clearFirebaseCertCacheForTests();
+  const originalFetch = globalThis.fetch; const calls: string[] = [];
+  globalThis.fetch = (async function(this: typeof globalThis, input: RequestInfo | URL): Promise<Response> {
+    assert.equal(this, globalThis);
+    const url = String(input); calls.push(url);
+    if (url.includes("securetoken@system.gserviceaccount.com")) return Response.json({ "test-key": pem }, { headers: { "cache-control": "max-age=3600" } });
+    if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "mock-access", expires_in: 3600 });
+    if (url.includes("firestore.googleapis.com")) return Response.json([]);
+    throw new Error("unexpected mocked URL");
+  }) as typeof fetch;
+  try {
+    assert.equal((await new FirebaseIdTokenVerifier(project).verify(token())).sub, "owner-1");
+    const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    const auth = new GoogleAdminAuth({ FIREBASE_PROJECT_ID: project, GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: "worker@example.test", private_key: privatePem }) });
+    assert.equal(await auth.accessToken(), "mock-access");
+    assert.deepEqual(await new FirestoreRestStore(project, auth).query("controllerUnpairOperations", {}), []);
+    assert.equal(calls.length, 3);
+  } finally { globalThis.fetch = originalFetch; clearFirebaseCertCacheForTests(); }
+});
+
+test("Google OAuth network and HTTP failures produce safe diagnostics", async () => {
+  const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const env = { FIREBASE_PROJECT_ID: project, GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: "worker@example.test", private_key: privatePem }) };
+  const network = new GoogleAdminAuth(env, async () => { throw new TypeError("sensitive network details"); });
+  await assert.rejects(network.accessToken(), ApiError);
+  const rejected = new GoogleAdminAuth(env, async () => new Response("private oauth response", { status: 403 }));
+  await assert.rejects(rejected.accessToken(), ApiError);
+  const malformed = new GoogleAdminAuth(env, async () => new Response("not-json"));
+  await assert.rejects(malformed.accessToken(), ApiError);
+});
+
+test("Google OAuth caches successful access tokens", async () => {
+  const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }).toString(); let requests = 0;
+  const env = { FIREBASE_PROJECT_ID: project, GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: "worker@example.test", private_key: privatePem }) };
+  const auth = new GoogleAdminAuth(env, async (_input, init) => { requests++; const form = new URLSearchParams(String(init?.body)); assert.equal(form.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer"); return Response.json({ access_token: "mock-token", expires_in: 3600 }); });
+  assert.equal(await auth.accessToken(), "mock-token"); assert.equal(await auth.accessToken(), "mock-token"); assert.equal(requests, 1);
+});
+
+test("Firestore preserves generic API errors while classifying HTTP authorization failures", async () => {
+  const auth = { accessToken: async () => "mock-access" } as never;
+  const store = new FirestoreRestStore(project, auth, async () => new Response("private upstream detail", { status: 403 }));
+  await assert.rejects(store.query("controllerUnpairOperations", {}), (error: unknown) => error instanceof ApiError && error.code === "permission-denied" && error.message === "Firestore request failed.");
+  const network = new FirestoreRestStore(project, auth, async () => { throw new TypeError("private network detail"); });
+  await assert.rejects(network.query("controllerUnpairOperations", {}), (error: unknown) => error instanceof ApiError && error.message === "Firestore is temporarily unavailable.");
+});
+
+test("Firestore maps upstream status classes and rejects malformed JSON safely", async () => {
+  const auth = { accessToken: async () => "mock-access" } as never;
+  for (const [status, expected] of [[401, "internal"], [403, "permission-denied"], [404, "not-found"], [429, "internal"], [503, "unavailable"]] as const) {
+    const store = new FirestoreRestStore(project, auth, async () => new Response("private body", { status }));
+    await assert.rejects(store.query("controllerUnpairOperations", {}), (error: unknown) => error instanceof ApiError && error.code === expected);
+  }
+  const malformed = new FirestoreRestStore(project, auth, async () => new Response("not-json"));
+  await assert.rejects(malformed.query("controllerUnpairOperations", {}), (error: unknown) => error instanceof ApiError && error.message === "Firestore is temporarily unavailable.");
+});
+
+test("Firestore 403 diagnostics extract safe Google error metadata and omit raw body details", async () => {
+  const originalError = console.error; const logs: unknown[][] = []; console.error = (...args: unknown[]) => { logs.push(args); };
+  const upstream = {
+    error: {
+      code: 403,
+      status: "PERMISSION_DENIED",
+      message: "Permission denied for user private-user-123 with token secret-access-token",
+      details: [{
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        reason: "IAM_PERMISSION_DENIED",
+        domain: "firestore.googleapis.com",
+        metadata: { resource: "private-document-id", credential: "service-account-secret" },
+      }],
+    },
+  };
+  try {
+    const store = new FirestoreRestStore(project, { accessToken: async () => "do-not-log-access-token" } as never,
+      async () => Response.json(upstream, { status: 403 }));
+    await assert.rejects(store.query("controllerUnpairOperations", {}), (error: unknown) => error instanceof ApiError && error.code === "permission-denied" && error.message === "Firestore request failed.");
+    const logged = JSON.stringify(logs);
+    assert.match(logged, /"status":403/);
+    assert.match(logged, /"googleStatus":"PERMISSION_DENIED"/);
+    assert.match(logged, /"messageCategory":"permission_denied"/);
+    assert.match(logged, /"reason":"IAM_PERMISSION_DENIED"/);
+    assert.match(logged, /"domain":"firestore.googleapis.com"/);
+    for (const sensitive of [upstream.error.message, "private-user-123", "secret-access-token", "private-document-id", "service-account-secret", "do-not-log-access-token"]) {
+      assert.equal(logged.includes(sensitive), false);
+    }
+  } finally { console.error = originalError; }
+});
+
+test("scheduled handler contains configuration and Firestore failures", async () => {
+  await assert.doesNotReject(worker.scheduled({ scheduledTime: Date.now(), cron: "* * * * *" }, { FIREBASE_PROJECT_ID: project }));
 });
 
 test("sensitive structured log fields and token-like values are redacted", () => {
@@ -191,6 +337,30 @@ test("privileged Auth checks reject disabled and revoked Firebase users", async 
   await assert.rejects(admin.assertActiveToken("uid", 99), ApiError);
   const disabled = new FirebaseAuthAdmin(env, google, async () => new Response(JSON.stringify({ users: [{ localId: "uid", validSince: "0", disabled: true }] }), { status: 200 }));
   await assert.rejects(disabled.assertActiveToken("uid", 101), ApiError);
+});
+
+test("Firebase Auth lookup failures log safe category, status and Firebase error code", async () => {
+  const originalError = console.error; const originalWarn = console.warn; const logs: unknown[][] = [];
+  console.error = (...args: unknown[]) => { logs.push(args); }; console.warn = (...args: unknown[]) => { logs.push(args); };
+  try {
+    const auth = { accessToken: async () => "mock-access" } as never;
+    const rejected = new FirebaseAuthAdmin({ FIREBASE_PROJECT_ID: project }, auth, async () => new Response(JSON.stringify({ error: { code: 400, message: "API_KEY_INVALID", status: "INVALID_ARGUMENT" } }), { status: 400 }));
+    await assert.rejects(rejected.getUser("user-1"), (error: unknown) => error instanceof ApiError && error.status === 500);
+    const event = JSON.stringify(logs);
+    assert.match(event, /firebase_auth_lookup_http_failed/);
+    assert.match(event, /"status":400/);
+    assert.match(event, /API_KEY_INVALID|INVALID_ARGUMENT/);
+    assert.equal(event.includes("mock-access"), false);
+    logs.length = 0;
+    const malformed = new FirebaseAuthAdmin({ FIREBASE_PROJECT_ID: project }, auth, async () => new Response("sensitive response body"));
+    await assert.rejects(malformed.getUser("user-1"), (error: unknown) => error instanceof ApiError && error.code === "unavailable");
+    assert.match(JSON.stringify(logs), /invalid_json/);
+    assert.equal(JSON.stringify(logs).includes("sensitive response body"), false);
+    logs.length = 0;
+    const oauthFailure = new FirebaseAuthAdmin({ FIREBASE_PROJECT_ID: project }, { accessToken: async () => { throw new ApiError("unavailable", "OAuth unavailable"); } } as never, async () => { throw new Error("fetch must not run"); });
+    await assert.rejects(oauthFailure.getUser("user-1"), ApiError);
+    assert.match(JSON.stringify(logs), /oauth_token_acquisition/);
+  } finally { console.error = originalError; console.warn = originalWarn; }
 });
 
 test("unconfigured MQTT transport fails closed without publishing", async () => {

@@ -117,14 +117,19 @@ export default {
   },
 
   async scheduled(_event: ScheduledEventLike, env: Env): Promise<void> {
+    let stage = "initialization";
+    try {
+    logger.info("scheduled_unpair_sweep_started", { stage });
     const google = new GoogleAdminAuth(env);
     const store = new FirestoreRestStore(env.FIREBASE_PROJECT_ID, google);
     const mqtt = new UnconfiguredMqttTransport();
     const now = new Date();
+    stage = "due_query";
     const due = await store.query("controllerUnpairOperations", { where: { compositeFilter: { op: "AND", filters: [
       { fieldFilter: { field: { fieldPath: "status" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "pending" }, { stringValue: "prepared" }] } } } },
       { fieldFilter: { field: { fieldPath: "nextDeliveryAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
     ] } }, limit: 100 });
+    stage = "due_processing";
     for (const row of due) {
       const op = row.data;
       const expiresAt = op.expiresAt instanceof Date ? op.expiresAt.getTime() : Number.NaN;
@@ -133,12 +138,21 @@ export default {
         await expireMainControllerUnpair({ store, operationId: row.id, now, serverTimestamp: now });
       } else if (nextAt <= now.getTime()) await deliverUnpairOperation({ store, operation: { ...op, operationId: row.id }, mqtt, logger, now });
     }
+    stage = "expired_query";
     const expired = await store.query("controllerUnpairOperations", { where: { compositeFilter: { op: "AND", filters: [
       { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "pending" } } },
       { fieldFilter: { field: { fieldPath: "expiresAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
     ] } }, limit: 100 });
+    stage = "expiration_processing";
     for (const row of expired) if (row.data.expiresAt instanceof Date && row.data.expiresAt <= now) {
       await expireMainControllerUnpair({ store, operationId: row.id, now, serverTimestamp: now });
+    }
+    logger.info("scheduled_unpair_sweep_completed", { dueCount: due.length, expiredCount: expired.length });
+    } catch (error) {
+      logger.error("scheduled_unpair_sweep_failed", {
+        stage,
+        category: error instanceof ApiError ? `api_${error.code}` : error instanceof Error ? error.name : "unknown",
+      });
     }
   },
 };

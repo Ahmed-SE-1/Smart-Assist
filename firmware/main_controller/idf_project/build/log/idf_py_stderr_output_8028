@@ -1,0 +1,40 @@
+Compiler supported targets: xtensa-esp32-elf
+
+ESP Insights Project commit: e1b92a8-dirty
+ESP RainMaker Project commit: e1b92a8-dirty
+You have changed variables that require your cache to be deleted.
+Configure will be re-run and you may have to reset some variables.
+The following variables have changed:
+CMAKE_C_COMPILER= C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT8994~1.EXE
+CMAKE_CXX_COMPILER= C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT1FE9~1.EXE
+CMAKE_C_COMPILER= C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT8994~1.EXE
+CMAKE_CXX_COMPILER= C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT1FE9~1.EXE
+CMAKE_C_COMPILER= C:\Users\LAPTOP~1\ESPRES~1\tools\XTENSA~2\ESP-12~1.0_2\XTENSA~1\bin\XT8994~1.EXE
+
+CMake Error at C:/Users/LAPTOPS LOUNGE/.espressif/tools/cmake/3.24.0/share/cmake-3.24/Modules/CMakeTestCCompiler.cmake:69 (message):
+  The C compiler
+
+    "C:/Users/LAPTOPS LOUNGE/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc.exe"
+
+  is not able to compile a simple test program.
+
+  It fails with the following output:
+
+    Change Dir: D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/CMakeFiles/CMakeTmp
+    
+    Run Build Command(s):C:/Users/LAPTOPS LOUNGE/.espressif/tools/ninja/1.10.2/ninja.exe cmTC_18d5c && 
+    CreateProcess failed. Command attempted:
+    """   -mlongcalls -Wno-frame-address -o CMakeFiles/cmTC_18d5c.dir/testCCompiler.c.obj -c "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/CMakeFiles/CMakeTmp/testCCompiler.c""
+    ninja: fatal: CreateProcess: The parameter is incorrect.
+     (is the command line too long?)
+    
+    
+
+  
+
+  CMake will not be able to correctly generate this project.
+Call Stack (most recent call first):
+  C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/tools/cmake/project.cmake:505 (__project)
+  CMakeLists.txt:15 (project)
+
+

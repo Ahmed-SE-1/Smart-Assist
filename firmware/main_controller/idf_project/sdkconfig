@@ -350,6 +350,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 # SmartAssist security
 #
 CONFIG_SMARTASSIST_DEVELOPMENT_MODE=y
+CONFIG_SMARTASSIST_WORKER_BASE_URL="https://smartassist-api.ahmedaliqurexhi7867.workers.dev"
 # end of SmartAssist security
 
 #
