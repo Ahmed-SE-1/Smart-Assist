@@ -48,11 +48,13 @@ npm run typecheck
 
 Tests use Node's built-in test runner and generated local RSA keys/mocks. They prove local validation and domain behavior only; they are not Firebase, Google IAM, Firestore, Auth Admin, Cloudflare, or EMQX integration tests.
 
-## EMQX and Cron boundary
+## HTTPS controller operations and optional MQTT
 
-Existing Functions publish to `smartassist/{houseId}/controllers/{controllerId}/control` with QoS 1 and non-retained JSON `{v:1,type:"unpair",phase,operationId,houseId,controllerId,expiresAt}`. The Worker preserves that topic and payload. Repository source does not contain a verified project-specific EMQX HTTP API host/auth scheme, and no dashboard credentials were available. `UnconfiguredMqttTransport` therefore fails closed. Failed sends update durable retry metadata and never mark an operation completed. A real EMQX HTTP adapter must be implemented only after confirming the broker deployment, HTTP API endpoint, authentication mechanism, TLS requirements, and dashboard authorization. The mock transport interface is covered in tests.
+Unpair prepare and commit are delivered through the authenticated `/v1/controller/operations/poll` HTTPS endpoint. The controller presents a Firebase ID token; the Worker checks its UID, controller ID, credential generation, active House assignment and unpair operation before returning only that controller's durable command. Repeated polls are idempotent, and acknowledgements advance the prepare/commit transaction. EMQX delivery is not part of this critical path.
 
-The Cron handler checks pending/prepared operations due for delivery and expires overdue unprepared operations through the same domain transitions. Because the current transport is unconfigured, delivery remains pending with retry backoff. Prepared operations are not released by a failed send.
+The confirmed development EMQX Cloud v5 API root is `https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5`; the optional adapter builds exactly `/api/v5/publish`. `EMQX_API_URL` is set in top-level Wrangler `[vars]` for the default development environment. `EMQX_API_KEY` is the Deployment App ID and `EMQX_API_SECRET` is the Deployment App Secret; configure both as Worker secrets, never `[vars]`. Their values are not stored in the repository. MQTT publishing remains unverified until those secrets and API permission are confirmed.
+
+The Cron handler expires overdue unprepared operations. Prepared operations remain durable and available through HTTPS polling until the controller completes its commit; expiry or transport failures do not release the House.
 
 ## Intentionally not migrated
 
@@ -62,7 +64,7 @@ Legacy/unused exports remain in Firebase Functions: `healthCheck` (a separate au
 
 Rollback requires no data migration: the Worker has not been deployed and Firebase Functions remains intact. Rebuild Flutter with the prior Callable service provider to roll back. Keep both backends from mutating the same production operation during cutover; first deploy and integration-test the Worker in a staging Firebase project and separate EMQX staging broker, then switch clients deliberately. Flutter pairing and unpair routes use a build-configured HTTPS base URL and send Firebase ID tokens only on owner routes; claim/recovery device capabilities remain separate. Add real staging Flutter and device-level BLE/ESP32 tests before production cutover.
 
-Remaining blockers are service-account secret provisioning and IAM/API/billing verification, actual EMQX endpoint/auth verification and HTTP transport implementation, Cloudflare account/subdomain selection, staging integration tests, and a secure Worker-backed Flutter command publishing route.
+Remaining blockers are service-account secret provisioning and IAM/API/billing verification, EMQX Deployment App ID/Secret provisioning and publish-permission verification for optional MQTT, Cloudflare account/subdomain selection, staging integration tests, and hardware validation of encrypted NVS and the HTTPS unpair lifecycle.
 
 ## Stage 3 client and device integration
 

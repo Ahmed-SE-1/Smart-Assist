@@ -28,6 +28,11 @@ String mqttPassword;
 const char* FIREBASE_WEB_API_KEY = "AIzaSyDyViB6jCVE0mxUYpx-qnBCV8xePDhOp8U";
 const char* WORKER_CLAIM_PATH = "/v1/controller/claims";
 const char* WORKER_RECOVER_PATH = "/v1/controller/credentials/recover";
+const char* WORKER_IDENTITY_MIGRATE_PATH = "/v1/controller/identity/migrate";
+const char* WORKER_READINESS_PATH = "/v1/controller/readiness";
+const char* WORKER_OPERATION_POLL_PATH = "/v1/controller/operations/poll";
+constexpr uint32_t CONTROLLER_POLL_INTERVAL_MS = 10000;
+constexpr uint32_t READINESS_RETRY_INTERVAL_MS = 15000;
 const char* FIREBASE_SIGN_IN_URL_PREFIX =
   "https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=";
 const char* FIREBASE_REFRESH_URL_PREFIX =
@@ -173,11 +178,15 @@ uint32_t nextMqttAttemptMs = 0;
 uint32_t nextWifiAttemptMs = 0;
 uint32_t nextAckAttemptMs = 0;
 uint32_t nextPairingAttemptMs = 0;
+uint32_t nextControllerPollMs = 0;
+uint32_t nextReadinessAttemptMs = 0;
 bool wifiStarted = false;
 bool espNowReady = false;
 bool blePairingBusy = false;
 bool recoveryAttemptMade = false;
 bool preferencesReady = false;
+bool pairingReadinessPending = false;
+bool cloudPairingReady = false;
 
 static const char* BLE_SERVICE_UUID = "9b0a1000-6f2a-4d71-9c3e-2a4b5c6d7e80";
 static const char* BLE_REQUEST_UUID = "9b0a1001-6f2a-4d71-9c3e-2a4b5c6d7e80";
@@ -304,7 +313,8 @@ bool waitForTlsClock(uint32_t timeoutMs = 10000) {
 }
 
 bool postHttps(const char* caCertificate, const String& url, const String& body, const String& bearer,
-               const char* contentType, String& responseBody, int& httpCode) {
+               const char* contentType, String& responseBody, int& httpCode,
+               uint32_t timeoutMs = 10000, uint32_t connectTimeoutMs = 8000) {
   httpCode = -1;
   if (WiFi.status() != WL_CONNECTED || !waitForTlsClock()) return false;
   Serial.printf("HTTPS preflight heap: free=%u largest_block=%u bytes.\n",
@@ -315,14 +325,15 @@ bool postHttps(const char* caCertificate, const String& url, const String& body,
   // transport state on a global WiFiClientSecure instance.
   WiFiClientSecure tlsClient;
   tlsClient.setCACert(caCertificate);
-  tlsClient.setTimeout(8000);
+  tlsClient.setTimeout(timeoutMs);
   HTTPClient http;
   if (!http.begin(tlsClient, url)) {
     http.end();
+    tlsClient.stop();
     return false;
   }
-  http.setTimeout(8000);
-  http.setConnectTimeout(8000);
+  http.setTimeout(timeoutMs);
+  http.setConnectTimeout(connectTimeoutMs);
   http.addHeader("Content-Type", contentType);
   if (bearer.length() > 0) http.addHeader("Authorization", "Bearer " + bearer);
   httpCode = http.POST(body);
@@ -335,6 +346,7 @@ bool postHttps(const char* caCertificate, const String& url, const String& body,
   }
   if (httpCode > 0) responseBody = http.getString();
   http.end();
+  tlsClient.stop();
   return httpCode >= 200 && httpCode < 300;
 }
 
@@ -359,10 +371,14 @@ bool workerPost(const String& path, JsonDocument& data, const String& bearer,
   serializeJson(data, requestBody);
   String responseBody;
   int httpCode = 0;
+  // Worker operations execute multi-entity atomic Firestore transactions and Auth identity
+  // provisioning across the public cloud. Allow a 20s read timeout (matching Flutter client).
   if (!postHttps(worker_ca_cert, endpoint, requestBody, bearer, "application/json",
-                 responseBody, httpCode)) {
+                 responseBody, httpCode, 20000, 10000)) {
     Serial.printf("Worker HTTP request failed (%d).\n", httpCode);
-    if (httpCode < 0 && time(nullptr) >= 1700000000 && WiFi.status() == WL_CONNECTED) {
+    if (httpCode == HTTPC_ERROR_READ_TIMEOUT) {
+      Serial.println("Worker HTTP request timed out waiting for server response.");
+    } else if (httpCode < 0 && time(nullptr) >= 1700000000 && WiFi.status() == WL_CONNECTED) {
       Serial.println("Worker HTTPS transport failed before an HTTP response (TLS/network).");
     }
     return false;
@@ -454,6 +470,39 @@ bool refreshFirebaseIdToken(bool force = false) {
   firebaseSessionAuthenticated = true;
   return true;
 #endif
+}
+
+bool reportControllerReadiness() {
+  if (!PROTECTED_NVS_AVAILABLE || !NVS_ENCRYPTION_AVAILABLE ||
+      !preferencesReady || houseId.isEmpty() || controllerId.isEmpty() ||
+      credentialGeneration <= 0 || firebaseRefreshToken.isEmpty() ||
+      !refreshFirebaseIdToken()) {
+    return false;
+  }
+  StaticJsonDocument<192> request;
+  request["controllerId"] = controllerId;
+  request["storageMode"] = "encrypted_nvs";
+  DynamicJsonDocument response(1024);
+  if (!workerPost(WORKER_READINESS_PATH, request, firebaseIdToken, response) ||
+      response["status"] != "cloud_ready" ||
+      response["controllerId"] != controllerId ||
+      response["houseId"] != houseId ||
+      response["credentialGeneration"] != credentialGeneration) {
+    Serial.println("Cloud pairing readiness confirmation is pending.");
+    return false;
+  }
+  cloudPairingReady = true;
+  pairingReadinessPending = false;
+  Serial.println("Cloud pairing identity and protected storage confirmed.");
+  return true;
+}
+
+void retryControllerReadiness() {
+  if (houseId.isEmpty() || cloudPairingReady ||
+      static_cast<int32_t>(millis() - nextReadinessAttemptMs) < 0) return;
+  nextReadinessAttemptMs = millis() + READINESS_RETRY_INTERVAL_MS;
+  pairingReadinessPending = true;
+  reportControllerReadiness();
 }
 
 bool persistPairing(const String& newHouseId, const String& newControllerId,
@@ -730,12 +779,9 @@ bool parseUtcIso8601(const char* value, time_t& result) {
 }
 
 bool acknowledgeUnpair(bool completed) {
-#if CONFIG_SMARTASSIST_DEVELOPMENT_MODE
-  Serial.println("failed-precondition: unpair recovery requires persistent protected storage; development recovery is RAM-only.");
-  return false;
-#else
   if (unpairOperationId.isEmpty() || controllerId.isEmpty() ||
-      firebaseRefreshToken.isEmpty()) return false;
+      firebaseRefreshToken.isEmpty() || !PROTECTED_NVS_AVAILABLE ||
+      !NVS_ENCRYPTION_AVAILABLE || !preferencesReady) return false;
   if (!refreshFirebaseIdToken()) return false;
   StaticJsonDocument<256> data;
   data["controllerId"] = controllerId;
@@ -755,8 +801,7 @@ bool acknowledgeUnpair(bool completed) {
 
   if (!completed) {
     unpairPhase = "prepared";
-    preferences.putString("unpair_phase", unpairPhase);
-    return true;
+    return preferences.putString("unpair_phase", unpairPhase) == unpairPhase.length();
   }
 
   // A confirmed response is the only point at which local recovery state and
@@ -781,17 +826,9 @@ bool acknowledgeUnpair(bool completed) {
   if (mqttClient.connected()) mqttClient.disconnect();
   Serial.println("Main Controller unpair completed and confirmed.");
   return true;
-#endif
 }
 
 void receiveUnpairControl(const byte* payload, unsigned int length) {
-#if CONFIG_SMARTASSIST_DEVELOPMENT_MODE
-  (void)payload;
-  (void)length;
-  Serial.println("failed-precondition: unpair is unavailable in Development Mode because recovery material is RAM-only.");
-  sendBleFailure("failed-precondition");
-  return;
-#else
   if (payload == nullptr || length == 0 || length >= 384) return;
   DynamicJsonDocument message(768);
   if (deserializeJson(message, payload, length) || message["v"] != 1 ||
@@ -820,7 +857,7 @@ void receiveUnpairControl(const byte* payload, unsigned int length) {
     if (unpairPhase.isEmpty()) {
       const time_t now = time(nullptr);
       if (now < 1700000000 || now >= expiresAt || houseId != requestedHouse ||
-          !preferencesReady || !PROTECTED_NVS_AVAILABLE) {
+          !preferencesReady || !PROTECTED_NVS_AVAILABLE || !NVS_ENCRYPTION_AVAILABLE) {
         Serial.println("Prepare cannot be safely accepted yet.");
         return;
       }
@@ -870,7 +907,6 @@ void receiveUnpairControl(const byte* payload, unsigned int length) {
     return;
   }
   Serial.println("Unknown controller control phase ignored.");
-#endif
 }
 
 void processPairingRequests() {
@@ -898,25 +934,17 @@ void processPairingRequests() {
     return;
   }
   blePairingBusy = true;
-  nextPairingAttemptMs = millis() + 10000;
+  nextPairingAttemptMs = millis() + 25000;
 
-#if CONFIG_SMARTASSIST_DEVELOPMENT_MODE
-  if (!NVS_STORAGE_AVAILABLE || !preferencesReady) {
-#else
   if (!PROTECTED_NVS_AVAILABLE || !NVS_ENCRYPTION_AVAILABLE || !preferencesReady) {
-#endif
     sendBleFailure("failed-precondition");
-    Serial.println("Pairing refused because protected NVS is not configured.");
+    Serial.println("Pairing refused: encrypted NVS is required before claiming a House.");
     blePairingBusy = false;
     return;
   }
-#if CONFIG_SMARTASSIST_DEVELOPMENT_MODE
-  // A rebooted development build has identity metadata but deliberately has
-  // no bearer token; allow a fresh BLE pairing/authentication attempt.
-  if ((!houseId.isEmpty() && !firebaseRefreshToken.isEmpty()) || !unpairPhase.isEmpty()) {
-#else
-  if (!houseId.isEmpty() || !unpairPhase.isEmpty()) {
-#endif
+  const bool identityMigrationRequest = !houseId.isEmpty() &&
+      haveNewPairingRequest && !token.isEmpty() && unpairPhase.isEmpty();
+  if ((!houseId.isEmpty() && !identityMigrationRequest) || !unpairPhase.isEmpty()) {
     Serial.println("Pairing failed: controller is already paired or has pending recovery.");
     sendBleFailure("already-exists");
     blePairingBusy = false;
@@ -931,21 +959,12 @@ void processPairingRequests() {
 
   if (haveNewPairingRequest) {
     pendingRecoverySecret = makeRecoverySecret();
-#if !CONFIG_SMARTASSIST_DEVELOPMENT_MODE
     if (!validPairingToken(pendingRecoverySecret) ||
         preferences.putString("pair_recover", pendingRecoverySecret) != pendingRecoverySecret.length()) {
       sendBleFailure("credential-persistence-failed");
       blePairingBusy = false;
       return;
     }
-#else
-    if (!validPairingToken(pendingRecoverySecret)) {
-      Serial.println("Pairing failed: recovery material could not be generated.");
-      sendBleFailure("failed-precondition");
-      blePairingBusy = false;
-      return;
-    }
-#endif
     volatilePairingToken = token;
   }
 
@@ -953,7 +972,12 @@ void processPairingRequests() {
   data["controllerId"] = controllerId;
   DynamicJsonDocument claimResponse(8192);
   bool claimOk = false;
-  if (!token.isEmpty()) {
+  if (identityMigrationRequest) {
+    data["token"] = token;
+    data["recoverySecret"] = pendingRecoverySecret;
+    Serial.println("Owner-authorized controller identity migration started.");
+    claimOk = workerPost(WORKER_IDENTITY_MIGRATE_PATH, data, "", claimResponse);
+  } else if (!token.isEmpty()) {
     data["token"] = token;
     data["recoverySecret"] = pendingRecoverySecret;
     Serial.println("Worker claim request started.");
@@ -1017,6 +1041,13 @@ void processPairingRequests() {
   firebaseIdToken = newIdToken;
   idTokenExpiresAtMs = millis() + static_cast<uint32_t>(lifetime) * 1000UL;
   firebaseSessionAuthenticated = true;
+  pairingReadinessPending = true;
+  if (!reportControllerReadiness()) {
+    sendBleFailure("cloud-readiness-pending");
+    Serial.println("Pairing state is stored; cloud readiness will be retried over HTTPS.");
+    blePairingBusy = false;
+    return;
+  }
   sendBlePairingSuccess(houseId, controllerId);
   Serial.println("Pairing succeeded; authenticated session is active.");
   if (mqttClient.connected()) mqttClient.disconnect();
@@ -1039,6 +1070,46 @@ void drainUnpairMessages() {
                          strnlen(message.payload, sizeof(message.payload)));
     memset(message.payload, 0, sizeof(message.payload));
   }
+}
+
+void pollControllerOperations() {
+  if (!PROTECTED_NVS_AVAILABLE || !NVS_ENCRYPTION_AVAILABLE ||
+      !preferencesReady || houseId.isEmpty() || controllerId.isEmpty() ||
+      unpairPhase == "invalid" ||
+      static_cast<int32_t>(millis() - nextControllerPollMs) < 0) return;
+  nextControllerPollMs = millis() + CONTROLLER_POLL_INTERVAL_MS;
+  if (!refreshFirebaseIdToken()) {
+    Serial.println("Controller operation poll deferred: Firebase authentication unavailable.");
+    return;
+  }
+
+  StaticJsonDocument<160> request;
+  request["controllerId"] = controllerId;
+  DynamicJsonDocument response(1024);
+  if (!workerPost(WORKER_OPERATION_POLL_PATH, request, firebaseIdToken, response)) {
+    Serial.println("Controller operation poll failed; it will retry.");
+    return;
+  }
+  if (response["operation"].isNull()) return;
+  JsonObject operation = response["operation"].as<JsonObject>();
+  if (operation.isNull() || operation["v"] != 1 || operation["type"] != "unpair" ||
+      !operation["phase"].is<const char*>() ||
+      !operation["operationId"].is<const char*>() ||
+      !operation["houseId"].is<const char*>() ||
+      !operation["controllerId"].is<const char*>() ||
+      !operation["expiresAt"].is<const char*>()) {
+    Serial.println("Worker operation response was invalid; ignored.");
+    return;
+  }
+
+  char payload[384] = {};
+  const size_t length = serializeJson(operation, payload, sizeof(payload));
+  if (length == 0 || length >= sizeof(payload)) {
+    Serial.println("Worker operation response exceeded the supported size.");
+    return;
+  }
+  receiveUnpairControl(reinterpret_cast<const byte*>(payload), length);
+  memset(payload, 0, sizeof(payload));
 }
 
 
@@ -1403,6 +1474,8 @@ void loop() {
   mqttClient.loop();
   drainUnpairMessages();
   processPairingRequests();
+  retryControllerReadiness();
+  pollControllerOperations();
   retryPendingUnpairAcknowledgement();
   processPirEvents();
 }

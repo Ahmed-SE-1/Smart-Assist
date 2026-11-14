@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
-import worker from "../src/index.ts";
+import worker, { fetchAllRowsByStatus } from "../src/index.ts";
 import { ApiError } from "../src/errors.ts";
 import { FirebaseIdTokenVerifier, clearFirebaseCertCacheForTests } from "../src/firebase-id-token.ts";
 import { redactFields } from "../src/logging.ts";
-import { acknowledgeMainControllerUnpairCompleted, acknowledgeMainControllerUnpairPrepared, claimMainController, createPairingSession, expireMainControllerUnpair, hashPairingToken, PairingError, recoverMainControllerCredential, requestMainControllerUnpair, validateControllerIdentityClaims } from "../../functions/src/controller_pairing.ts";
+import { acknowledgeMainControllerUnpairCompleted, acknowledgeMainControllerUnpairPrepared, claimMainController, consumeControllerIdentityMigrationSession, createControllerIdentityMigrationSession, createPairingSession, expireMainControllerUnpair, hashPairingToken, PairingError, pollMainControllerOperation, recoverMainControllerCredential, requestMainControllerUnpair, validateControllerIdentityClaims } from "../../functions/src/controller_pairing.ts";
 import { FirebaseAuthAdmin } from "../src/firebase-auth-admin.ts";
-import { UnconfiguredMqttTransport } from "../src/mqtt-adapter.ts";
+import { createMqttTransport, EmqxHttpPublishTransport, normalizeEmqxPublishUrl, UnconfiguredMqttTransport } from "../src/mqtt-adapter.ts";
 import { deliverUnpairOperation } from "../src/unpair-delivery.ts";
 import { FirestoreRestStore } from "../src/firestore-rest.ts";
 import { GoogleAdminAuth } from "../src/google-auth.ts";
@@ -224,8 +224,14 @@ test("HTTP rejects malformed, oversized, wrong content type, and missing authent
 
 class MemoryStore {
   docs = new Map<string, Record<string, unknown>>();
+  private transactionTail: Promise<void> = Promise.resolve();
   doc(collection: string, id: string) { return { toString: () => `${collection}/${id}` }; }
   async runTransaction<T>(callback: (tx: { get(ref: object): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined }>; create(ref: object, data: Record<string, unknown>): void; update(ref: object, data: Record<string, unknown>): void }) => Promise<T>): Promise<T> {
+    const previous = this.transactionTail;
+    let release!: () => void;
+    this.transactionTail = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try {
     const writes: Array<() => void> = [];
     const tx = {
       get: async (ref: object) => { const value = this.docs.get(String(ref)); return { exists: !!value, data: () => value ? { ...value } : undefined }; },
@@ -235,6 +241,9 @@ class MemoryStore {
     const result = await callback(tx);
     for (const write of writes) write();
     return result;
+    } finally {
+      release();
+    }
   }
 }
 
@@ -267,6 +276,23 @@ test("pairing claim binds controller atomically, rejects replay, and supports bo
   const recovered = await recoverMainControllerCredential({ store, recoverySecret: recovery, controllerId, now: new Date(2000) });
   assert.equal(recovered.credentialGeneration, 1);
   await assert.rejects(recoverMainControllerCredential({ store, recoverySecret: recovery, controllerId, now: new Date(700_000) }), PairingError);
+});
+
+test("owner-authorized identity migration preserves assignment and rotates generation idempotently", async () => {
+  const store = new MemoryStore(); const id = "CTRL_001122aabbcc";
+  const migrationToken = "m".repeat(43); const recoverySecret = "r".repeat(43);
+  store.docs.set("users/owner-1", { id: "owner-1", role: "owner", houseId: "house-1", isApproved: true });
+  store.docs.set("houses/house-1", { houseId: "house-1", ownerUid: "owner-1", mainControllerId: id });
+  store.docs.set(`controllers/${id}`, { controllerId: id, activeHouseId: "house-1", authCredentialStatus: "active", authCredentialGeneration: 1, pairingReadiness: "pending" });
+  await createControllerIdentityMigrationSession({ store, uid: "owner-1", houseId: "house-1", controllerId: id, token: migrationToken, now: new Date(1000), serverTimestamp: new Date(1000) });
+  const migrated = await consumeControllerIdentityMigrationSession({ store, token: migrationToken, controllerId: id, recoverySecret, now: new Date(2000), serverTimestamp: new Date(2000) });
+  assert.equal(migrated.houseId, "house-1");
+  assert.equal(migrated.credentialGeneration, 2);
+  assert.equal(store.docs.get("houses/house-1")?.mainControllerId, id);
+  const recovery = await recoverMainControllerCredential({ store, recoverySecret, controllerId: id, now: new Date(3000) });
+  assert.equal(recovery.credentialGeneration, 2);
+  assert.equal(recovery.rotateGeneration, true);
+  await assert.rejects(createControllerIdentityMigrationSession({ store, uid: "owner-1", houseId: "house-1", controllerId: id, token: "s".repeat(43), now: new Date(4000), serverTimestamp: new Date(4000) }), (error: unknown) => error instanceof PairingError && error.code === "already-exists");
 });
 
 test("Auth provisioning failure after assignment leaves a recoverable claim", async () => {
@@ -308,6 +334,37 @@ test("unpair preserves prepare/commit ordering and duplicate acknowledgements", 
   assert.equal((await acknowledgeMainControllerUnpairCompleted({ store, operationId, controllerId: id, now, serverTimestamp: now })).status, "completed");
 });
 
+test("HTTPS operation polling is controller-scoped, repeatable, and advances prepare to commit", async () => {
+  const store = new MemoryStore(); const id = "CTRL_001122aabbcc"; const operationId = "h".repeat(32);
+  const nowDate = new Date(10_000);
+  store.docs.set(`controllers/${id}`, { controllerId: id, activeHouseId: "house-1", authCredentialStatus: "active", authCredentialGeneration: 4, pendingUnpairOperationId: operationId });
+  store.docs.set("houses/house-1", { houseId: "house-1", mainControllerId: id, pendingUnpairOperationId: operationId });
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId: id, status: "pending", expiresAt: new Date(60_000) });
+
+  const prepare = await pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 4, now: nowDate });
+  assert.deepEqual(prepare, { v: 1, type: "unpair", phase: "prepare", operationId, houseId: "house-1", controllerId: id, expiresAt: new Date(60_000).toISOString() });
+  assert.deepEqual(await pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 4, now: nowDate }), prepare);
+  await acknowledgeMainControllerUnpairPrepared({ store, operationId, controllerId: id, now: nowDate, serverTimestamp: nowDate });
+  const commit = await pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 4, now: nowDate });
+  assert.deepEqual(commit, { ...prepare, phase: "commit" });
+  await acknowledgeMainControllerUnpairCompleted({ store, operationId, controllerId: id, now: nowDate, serverTimestamp: nowDate });
+  await assert.rejects(pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 4, now: nowDate }), PairingError);
+});
+
+test("HTTPS operation polling returns no command when idle or expired and rejects stale generations", async () => {
+  const store = new MemoryStore(); const id = "CTRL_001122aabbcc";
+  store.docs.set(`controllers/${id}`, { controllerId: id, activeHouseId: "house-1", authCredentialStatus: "active", authCredentialGeneration: 2 });
+  store.docs.set("houses/house-1", { houseId: "house-1", mainControllerId: id });
+  assert.equal(await pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 2, now: new Date(10_000) }), null);
+  await assert.rejects(pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 1, now: new Date(10_000) }), PairingError);
+
+  const operationId = "x".repeat(32);
+  store.docs.get(`controllers/${id}`)!.pendingUnpairOperationId = operationId;
+  store.docs.get("houses/house-1")!.pendingUnpairOperationId = operationId;
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId: id, status: "pending", expiresAt: new Date(5_000) });
+  assert.equal(await pollMainControllerOperation({ store, controllerId: id, credentialGeneration: 2, now: new Date(10_000) }), null);
+});
+
 test("Cron expiry fails overdue pending operation while retaining safe registry semantics", async () => {
   const store = new MemoryStore(); const id = "CTRL_001122aabbcc"; const operationId = "e".repeat(32);
   store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId: id, status: "pending", expiresAt: new Date(1000) });
@@ -317,6 +374,21 @@ test("Cron expiry fails overdue pending operation while retaining safe registry 
   assert.equal(store.docs.get(`controllerUnpairOperations/${operationId}`)?.status, "failed");
   assert.equal(store.docs.get("houses/house-1")?.mainControllerId, id);
   assert.equal(store.docs.get("houses/house-1")?.pendingUnpairOperationId, null);
+});
+
+test("authenticated late prepare acknowledgement can recover an expired pending operation", async () => {
+  const store = new MemoryStore(); const controllerId = "CTRL_001122aabbcc"; const operationId = "l".repeat(32);
+  const expiresAt = new Date(2000); const afterExpiry = new Date(3000);
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId, status: "pending", expiresAt });
+  store.docs.set("houses/house-1", { houseId: "house-1", mainControllerId: controllerId, pendingUnpairOperationId: operationId, lastUnpairOperationId: operationId });
+  store.docs.set(`controllers/${controllerId}`, { controllerId, activeHouseId: "house-1", pendingUnpairOperationId: operationId, status: "unpair_pending" });
+  assert.equal(await expireMainControllerUnpair({ store, operationId, now: afterExpiry, serverTimestamp: afterExpiry }), true);
+  const prepared = await acknowledgeMainControllerUnpairPrepared({ store, operationId, controllerId, now: afterExpiry, serverTimestamp: afterExpiry });
+  assert.equal(prepared.status, "prepared");
+  assert.equal(store.docs.get("houses/house-1")?.pendingUnpairOperationId, operationId);
+  assert.equal(store.docs.get(`controllers/${controllerId}`)?.status, "unpair_prepared");
+  const completed = await acknowledgeMainControllerUnpairCompleted({ store, operationId, controllerId, now: afterExpiry, serverTimestamp: afterExpiry });
+  assert.equal(completed.status, "completed");
 });
 
 test("device identity claims are bound to UID, controller, generation, state, expiry and revocation", () => {
@@ -367,6 +439,102 @@ test("unconfigured MQTT transport fails closed without publishing", async () => 
   await assert.rejects(new UnconfiguredMqttTransport().publish("topic", "payload", 1, false), ApiError);
 });
 
+test("createMqttTransport selects transport based on env configuration", async () => {
+  const unconfigured = createMqttTransport({ FIREBASE_PROJECT_ID: project });
+  assert.ok(unconfigured instanceof UnconfiguredMqttTransport);
+
+  const configured = createMqttTransport({
+    FIREBASE_PROJECT_ID: project,
+    EMQX_API_URL: "https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5",
+    EMQX_API_KEY: "test-key",
+    EMQX_API_SECRET: "test-secret",
+  });
+  assert.ok(configured instanceof EmqxHttpPublishTransport);
+});
+
+test("EmqxHttpPublishTransport formats request with Basic auth and parameters", async () => {
+  let calledUrl = "";
+  let calledHeaders: Record<string, string> = {};
+  let calledBody = "";
+  const fetcher = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    calledUrl = String(input);
+    calledHeaders = (init?.headers ?? {}) as Record<string, string>;
+    calledBody = String(init?.body ?? "");
+    return Response.json({ id: "mock-publish-id" }, { status: 200 });
+  };
+
+  const transport = new EmqxHttpPublishTransport("https://broker.example.com/api/v5", "my-app-id", "my-app-secret", fetcher);
+  await transport.publish("smartassist/house-1/controllers/CTRL_123/control", '{"v":1}', 1, false);
+
+  assert.equal(calledUrl, "https://broker.example.com/api/v5/publish");
+  assert.equal(calledHeaders.Authorization, `Basic ${Buffer.from("my-app-id:my-app-secret").toString("base64")}`);
+  assert.equal(calledHeaders["content-type"], "application/json");
+  assert.deepEqual(JSON.parse(calledBody), {
+    topic: "smartassist/house-1/controllers/CTRL_123/control",
+    payload: '{"v":1}',
+    qos: 1,
+    retain: false,
+  });
+});
+
+test("EMQX URL normalization produces one API v5 publish suffix", () => {
+  assert.equal(normalizeEmqxPublishUrl("https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5"), "https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5/publish");
+  assert.equal(normalizeEmqxPublishUrl("https://broker.example.com"), "https://broker.example.com/api/v5/publish");
+  assert.equal(normalizeEmqxPublishUrl("https://broker.example.com/api/v5"), "https://broker.example.com/api/v5/publish");
+  assert.throws(() => normalizeEmqxPublishUrl("http://broker.example.com"), ApiError);
+  assert.throws(() => normalizeEmqxPublishUrl("https://broker.example.com/api/v5/api/v5"), ApiError);
+});
+
+test("EMQX configuration rejects partial values and missing configuration fails closed", async () => {
+  assert.ok(createMqttTransport({ FIREBASE_PROJECT_ID: project }) instanceof UnconfiguredMqttTransport);
+  assert.throws(() => createMqttTransport({ FIREBASE_PROJECT_ID: project, EMQX_API_URL: "https://broker.example.com" }), ApiError);
+  await assert.rejects(new UnconfiguredMqttTransport().publish("topic", "payload", 1, false), ApiError);
+});
+
+test("EMQX publish rejects HTTP errors, no-subscriber responses, and timeouts", async () => {
+  const forbidden = new EmqxHttpPublishTransport("https://broker.example.com/api/v5", "app-id", "app-secret", async () => new Response("{}", { status: 403 }));
+  await assert.rejects(forbidden.publish("topic", "payload", 1, false), (error: unknown) => error instanceof ApiError && error.code === "permission-denied");
+  const noSubscribers = new EmqxHttpPublishTransport("https://broker.example.com/api/v5", "app-id", "app-secret", async () => Response.json({ message: "no_matching_subscribers", reason_code: 16 }, { status: 202 }));
+  await assert.rejects(noSubscribers.publish("topic", "payload", 1, false), (error: unknown) => error instanceof ApiError && error.code === "unavailable");
+  const timeout = new EmqxHttpPublishTransport("https://broker.example.com/api/v5", "app-id", "app-secret", async () => { throw new DOMException("timed out", "TimeoutError"); });
+  await assert.rejects(timeout.publish("topic", "payload", 1, false), (error: unknown) => error instanceof ApiError && error.code === "unavailable");
+});
+
+test("fetchAllRowsByStatus paginates with stable exclusive document cursors", async () => {
+  for (const count of [0, 100, 200, 237]) {
+    const documents = Array.from({ length: count }, (_, index) => ({
+      id: `operation-${String(index).padStart(3, "0")}`,
+      data: { status: "pending", index },
+    }));
+    const calls: Record<string, unknown>[] = [];
+    const fakeStore = {
+      query: async (collection: string, query: Record<string, unknown>) => {
+        assert.equal(collection, "controllerUnpairOperations");
+        calls.push(query);
+        assert.deepEqual(query.orderBy, [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }]);
+        const startAt = query.startAt as { values: Array<{ referenceValue: string }>; before: boolean } | undefined;
+        let offset = 0;
+        if (startAt) {
+          assert.equal(startAt.before, false);
+          const prefix = "projects/test-project/databases/(default)/documents/controllerUnpairOperations/";
+          assert.ok(startAt.values[0].referenceValue.startsWith(prefix));
+          const cursorId = decodeURIComponent(startAt.values[0].referenceValue.slice(prefix.length));
+          const cursorIndex = documents.findIndex(row => row.id === cursorId);
+          assert.notEqual(cursorIndex, -1);
+          offset = cursorIndex + 1;
+        }
+        return documents.slice(offset, offset + Number(query.limit));
+      },
+    };
+
+    const rows = await fetchAllRowsByStatus(fakeStore, "test-project", "pending");
+    assert.deepEqual(rows.map(row => row.id), documents.map(row => row.id));
+    assert.equal(new Set(rows.map(row => row.id)).size, count);
+    assert.equal(calls.length, count === 0 ? 1 : Math.floor(count / 100) + 1);
+    assert.ok(calls.every(query => query.limit === 100));
+  }
+});
+
 test("MQTT delivery failure records retry metadata and never completes unpair", async () => {
   const store = new MemoryStore(); const operationId = "x".repeat(32); const nowTime = new Date(10_000);
   store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, status: "pending", deliveryAttempts: 0 });
@@ -390,7 +558,48 @@ test("unpair delivery preserves existing topic and payload contract", async () =
     mqtt: { publish: async (topic, payload, qos, retain) => { published = JSON.stringify({ topic, payload: JSON.parse(payload), qos, retain }); } },
     logger: { info: () => {}, error: () => {}, warn: () => {} }, now: new Date(0) });
   assert.equal(ok, true);
+  assert.equal(store.docs.get(`controllerUnpairOperations/${operationId}`)?.status, "prepared");
   assert.deepEqual(JSON.parse(published), { topic: "smartassist/house-1/controllers/CTRL_001122aabbcc/control", payload: { v: 1, type: "unpair", phase: "commit", operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", expiresAt: "1970-01-01T00:00:01.000Z" }, qos: 1, retain: false });
+});
+
+test("pending publish sends prepare but does not acknowledge or complete the operation", async () => {
+  const operationId = "p".repeat(32); const now = new Date(1000); const store = new MemoryStore();
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", status: "pending", deliveryAttempts: 0, nextDeliveryAt: now });
+  let published: { topic: string; payload: Record<string, unknown>; qos: number; retain: boolean } | undefined;
+  const sent = await deliverUnpairOperation({ store, operation: { operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", status: "pending", deliveryAttempts: 0, expiresAt: new Date(100_000) },
+    mqtt: { publish: async (topic, payload, qos, retain) => { published = { topic, payload: JSON.parse(payload), qos, retain }; } },
+    logger: { info: () => {}, error: () => {}, warn: () => {} }, now });
+  assert.equal(sent, true);
+  assert.deepEqual(published, { topic: "smartassist/house-1/controllers/CTRL_001122aabbcc/control", payload: { v: 1, type: "unpair", phase: "prepare", operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", expiresAt: "1970-01-01T00:01:40.000Z" }, qos: 1, retain: false });
+  assert.equal(store.docs.get(`controllerUnpairOperations/${operationId}`)?.status, "pending");
+});
+
+test("unpair delivery claim prevents duplicate concurrent sends", async () => {
+  const operationId = "d".repeat(32); const now = new Date(10_000); const store = new MemoryStore();
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", status: "pending", deliveryAttempts: 0, nextDeliveryAt: now });
+  let publishCount = 0;
+  const mqtt = { publish: async () => { publishCount++; await new Promise(resolve => setTimeout(resolve, 1)); } };
+  const args = { store, operation: { operationId, houseId: "house-1", controllerId: "CTRL_001122aabbcc", status: "pending", deliveryAttempts: 0, expiresAt: new Date(100_000) },
+    mqtt, logger: { info: () => {}, error: () => {}, warn: () => {} }, now };
+  const results = await Promise.all([deliverUnpairOperation(args), deliverUnpairOperation({ ...args, force: true })]);
+  assert.deepEqual(results.sort(), [false, true]);
+  assert.equal(publishCount, 1);
+  assert.equal(store.docs.get(`controllerUnpairOperations/${operationId}`)?.deliveryAttempts, 1);
+});
+
+test("a pre-existing due pending unpair operation can be recovered and redelivered", async () => {
+  const operationId = "r".repeat(32); const controllerId = "CTRL_001122aabbcc"; const now = new Date(50_000); const store = new MemoryStore();
+  store.docs.set("users/owner-1", { id: "owner-1", role: "owner", houseId: "house-1", isApproved: true });
+  store.docs.set("houses/house-1", { houseId: "house-1", ownerUid: "owner-1", mainControllerId: controllerId, pendingUnpairOperationId: operationId });
+  store.docs.set(`controllers/${controllerId}`, { controllerId, activeHouseId: "house-1", pendingUnpairOperationId: operationId });
+  store.docs.set(`controllerUnpairOperations/${operationId}`, { operationId, houseId: "house-1", controllerId, requestedBy: "owner-1", status: "pending", deliveryAttempts: 1, nextDeliveryAt: new Date(10_000), expiresAt: new Date(100_000) });
+  const recovered = await requestMainControllerUnpair({ store, uid: "owner-1", houseId: "house-1", controllerId, operationId: "n".repeat(32), now, expiresAt: new Date(200_000), serverTimestamp: now });
+  assert.equal(recovered.operationId, operationId);
+  let publishCount = 0;
+  const sent = await deliverUnpairOperation({ store, operation: recovered as unknown as Record<string, unknown>, mqtt: { publish: async () => { publishCount++; } },
+    logger: { info: () => {}, error: () => {}, warn: () => {} }, now });
+  assert.equal(sent, true);
+  assert.equal(publishCount, 1);
 });
 
 test("Firestore transaction conflict retries a bounded transaction", async () => {
@@ -412,4 +621,33 @@ test("Firestore transaction conflict retries a bounded transaction", async () =>
   });
   assert.equal(result, 4);
   assert.deepEqual(calls, { begins: 2, reads: 2, commits: 2 });
+});
+
+test("pairing claim retrieves documents concurrently in transaction", async () => {
+  const store = new MemoryStore();
+  const tokenValue = "c".repeat(43); const recovery = "d".repeat(43); const controllerId = "CTRL_001122aabbcc";
+  const tokenHash = hashPairingToken(tokenValue);
+  store.docs.set("pairingSessions/" + tokenHash, { tokenHash, houseId: "house-1", ownerUid: "owner-1", expiresAt: new Date(10_000), consumedAt: null });
+  store.docs.set("users/owner-1", { id: "owner-1", role: "owner", houseId: "house-1", isApproved: true });
+  store.docs.set("houses/house-1", { houseId: "house-1", ownerUid: "owner-1", mainControllerId: null });
+  const concurrentCalls: string[] = [];
+  const originalRunTx = store.runTransaction.bind(store);
+  store.runTransaction = async (operation) => {
+    return originalRunTx(async (tx) => {
+      const wrappedTx = {
+        ...tx,
+        get: async (ref: object) => {
+          concurrentCalls.push(String(ref));
+          return tx.get(ref);
+        },
+      };
+      return operation(wrappedTx);
+    });
+  };
+  const claimed = await claimMainController({ store, token: tokenValue, controllerId, recoverySecret: recovery, now: new Date(1000), serverTimestamp: new Date(1000) });
+  assert.deepEqual(claimed, { houseId: "house-1", controllerId });
+  assert.ok(concurrentCalls.includes("users/owner-1"));
+  assert.ok(concurrentCalls.includes("houses/house-1"));
+  assert.ok(concurrentCalls.includes("controllers/CTRL_001122aabbcc"));
+  assert.ok(concurrentCalls.some(c => c.startsWith("controllerCredentialRecoverySessions/")));
 });

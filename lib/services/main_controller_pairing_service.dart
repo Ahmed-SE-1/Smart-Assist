@@ -61,6 +61,7 @@ class ControllerRegistryState {
     required this.houseExists,
     this.controllerId,
     this.status,
+    this.pairingReadiness,
     this.pairedAt,
     this.lastSeenAt,
     this.unpairOperationId,
@@ -70,6 +71,7 @@ class ControllerRegistryState {
   final bool houseExists;
   final String? controllerId;
   final String? status;
+  final String? pairingReadiness;
   final DateTime? pairedAt;
   final DateTime? lastSeenAt;
   final String? unpairOperationId;
@@ -198,6 +200,10 @@ class FirestoreControllerRegistryReader implements ControllerRegistryReader {
             controller?['status'] is String
                 ? controller!['status'] as String
                 : 'unknown',
+        pairingReadiness:
+            controller?['pairingReadiness'] is String
+                ? controller!['pairingReadiness'] as String
+                : null,
         pairedAt: _date(controller?['pairedAt']),
         lastSeenAt: _date(controller?['lastSeenAt']),
         unpairOperationId: operationId,
@@ -499,6 +505,45 @@ class ControllerPairingService {
     return MainControllerPairingSession(token: token, expiresAt: expiresAt);
   }
 
+  Future<MainControllerPairingSession> createIdentityMigrationSession(
+    User user,
+    String controllerId,
+  ) async {
+    final houseId = _approvedOwnerHouseId(user);
+    if (!RegExp(r'^CTRL_[A-Za-z0-9_-]{8,56}$').hasMatch(controllerId)) {
+      throw const MainControllerPairingException(
+        'invalid-controller-id',
+        'The registered controller identity is invalid.',
+      );
+    }
+    final response = await _apiCall(
+      () => _api.post('/v1/controller/identity-migration-sessions', {
+        'houseId': houseId,
+        'controllerId': controllerId,
+      }),
+    );
+    final token = response['token'];
+    final expiry = response['expiresAt'];
+    if (response['houseId'] != houseId ||
+        response['controllerId'] != controllerId ||
+        token is! String ||
+        !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(token) ||
+        expiry is! String) {
+      throw const MainControllerPairingException(
+        'invalid-session',
+        'The identity recovery service returned an invalid session.',
+      );
+    }
+    final expiresAt = DateTime.tryParse(expiry);
+    if (expiresAt == null || !expiresAt.isAfter(DateTime.now())) {
+      throw const MainControllerPairingException(
+        'expired-token',
+        'The identity recovery session expired. Try again.',
+      );
+    }
+    return MainControllerPairingSession(token: token, expiresAt: expiresAt);
+  }
+
   Future<({String controllerId, String houseId})> pairWithController({
     required User user,
     required MainControllerPairingSession session,
@@ -575,6 +620,7 @@ class ControllerPairingService {
       if (house?['mainControllerId'] != confirmation.controllerId ||
           controller?['activeHouseId'] != houseId ||
           controller?['authCredentialStatus'] != 'active' ||
+          controller?['pairingReadiness'] != 'cloud_ready' ||
           controller?['firebaseAuthUid'] !=
               'smartassist-controller-${confirmation.controllerId}') {
         throw const MainControllerPairingException(

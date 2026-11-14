@@ -150,7 +150,7 @@ class _MainControllerPairingScreenState
         _pairing = false;
         _progress = null;
       });
-      _showMessage('Main Controller ${result.controllerId} connected.');
+      _showMessage('Main Controller ${result.controllerId} paired and cloud-ready.');
     } catch (error) {
       if (!mounted) return;
       if (error is MainControllerPairingException &&
@@ -159,6 +159,36 @@ class _MainControllerPairingScreenState
       }
       setState(() {
         _pairing = false;
+        _progress = null;
+      });
+      _showMessage(_friendlyError(error), error: true);
+    }
+  }
+
+  Future<void> _migrateIdentity(User user, String controllerId) async {
+    setState(() {
+      _starting = true;
+      _message = null;
+      _progress = 'Preparing secure recovery for the existing controller…';
+    });
+    try {
+      final session = await ref
+          .read(controllerPairingServiceProvider)
+          .createIdentityMigrationSession(user, controllerId);
+      if (!mounted) return;
+      _session = session;
+      setState(() {
+        _starting = false;
+        _progress = null;
+      });
+      _showMessage(
+        'Keep the existing controller powered on, then select it to recover its cloud identity.',
+      );
+      _startScan();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _starting = false;
         _progress = null;
       });
       _showMessage(_friendlyError(error), error: true);
@@ -204,6 +234,35 @@ class _MainControllerPairingScreenState
         _showMessage('Main Controller successfully disconnected.');
       } else {
         _showMessage('Unpair pending. Waiting for the controller.');
+        _startUnpairPolling(user, operation.operationId);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(_friendlyError(error), error: true);
+    } finally {
+      if (mounted) setState(() => _unpairing = false);
+    }
+  }
+
+  Future<void> _retryUnpair(User user, String operationId) async {
+    setState(() {
+      _unpairing = true;
+      _message = null;
+    });
+    try {
+      final operation = await ref
+          .read(controllerPairingServiceProvider)
+          .retryUnpair(user, operationId);
+      if (!mounted) return;
+      if (operation.status == 'completed') {
+        _showMessage('Main Controller successfully disconnected.');
+      } else if (operation.status == 'failed') {
+        _showMessage(
+          'Unpair failed. The controller remains assigned; you can retry.',
+          error: true,
+        );
+      } else {
+        _showMessage('Retry sent. Waiting for the controller acknowledgement.');
         _startUnpairPolling(user, operation.operationId);
       }
     } catch (error) {
@@ -275,7 +334,12 @@ class _MainControllerPairingScreenState
   }
 
   String _friendlyError(Object error) {
-    if (error is MainControllerPairingException) return error.message;
+    if (error is MainControllerPairingException) {
+      if (error.code == 'cloud-readiness-pending') {
+        return 'The controller is assigned, but secure cloud readiness is pending. Keep it powered and check this screen again; do not start a second pairing.';
+      }
+      return error.message;
+    }
     if (error is TimeoutException) return 'The operation timed out. Try again.';
     if (error is FirebaseException) {
       if (error.code == 'permission-denied') {
@@ -519,9 +583,38 @@ class _MainControllerPairingScreenState
         ),
       );
     }
+    final activeUnpair =
+        state.unpairStatus == 'pending' ||
+        state.unpairStatus == 'prepared' ||
+        state.status == 'unpair_pending' ||
+        state.status == 'unpair_prepared';
+    final canRetryDelivery = activeUnpair && state.unpairOperationId != null;
+    final controllerOnline =
+        state.pairingReadiness == 'cloud_ready' &&
+        state.lastSeenAt != null &&
+        DateTime.now().difference(state.lastSeenAt!) <=
+            const Duration(minutes: 2);
+    final controllerTitle =
+        state.pairingReadiness != 'cloud_ready'
+            ? 'Pairing pending'
+            : controllerOnline
+            ? 'Main Controller online'
+            : 'Main Controller offline';
     return Card(
       child: Column(
         children: [
+          if (!activeUnpair && state.pairingReadiness != 'cloud_ready')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: OutlinedButton.icon(
+                onPressed:
+                    _starting || _pairing || _unpairing
+                        ? null
+                        : () => _migrateIdentity(user, state.controllerId!),
+                icon: const Icon(Icons.security_update),
+                label: const Text('Recover existing controller securely'),
+              ),
+            ),
           ListTile(
             leading: Icon(
               state.status == 'unpair_pending' ||
@@ -532,7 +625,9 @@ class _MainControllerPairingScreenState
                   state.status == 'unpair_pending' ||
                           state.status == 'unpair_prepared'
                       ? Colors.orange
-                      : Colors.green,
+                      : controllerOnline
+                      ? Colors.green
+                      : Colors.grey,
             ),
             title: Text(
               state.unpairStatus == 'pending' ||
@@ -540,14 +635,18 @@ class _MainControllerPairingScreenState
                   ? 'Unpair pending'
                   : state.unpairStatus == 'failed'
                   ? 'Unpair failed; controller remains assigned'
-                  : 'Main Controller connected',
+                  : controllerTitle,
             ),
             subtitle: Text(
               '${state.controllerId}\n${state.unpairStatus == 'prepared'
                   ? 'Waiting for controller to finish disconnecting'
                   : state.unpairStatus == 'pending'
                   ? 'Waiting for controller'
-                  : 'Status: ${state.status ?? 'unknown'}'}',
+                  : state.pairingReadiness != 'cloud_ready'
+                  ? 'Waiting for authenticated cloud readiness'
+                  : controllerOnline
+                  ? 'Cloud pairing confirmed; last contact ${state.lastSeenAt!.toLocal()}'
+                  : 'Cloud pairing confirmed; no recent controller contact',
             ),
             isThreeLine: true,
           ),
@@ -561,11 +660,10 @@ class _MainControllerPairingScreenState
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: OutlinedButton.icon(
               onPressed:
-                  _unpairing ||
-                          _pairing ||
-                          state.unpairStatus == 'pending' ||
-                          state.unpairStatus == 'prepared'
+                  _unpairing || _pairing || (activeUnpair && !canRetryDelivery)
                       ? null
+                      : canRetryDelivery
+                      ? () => _retryUnpair(user, state.unpairOperationId!)
                       : () => _confirmUnpair(user, state.controllerId!),
               icon:
                   _unpairing
@@ -573,9 +671,11 @@ class _MainControllerPairingScreenState
                         dimension: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                      : const Icon(Icons.link_off),
+                      : Icon(activeUnpair ? Icons.refresh : Icons.link_off),
               label: Text(
-                state.unpairStatus == 'failed'
+                activeUnpair
+                    ? 'Retry delivery'
+                    : state.unpairStatus == 'failed'
                     ? 'Retry disconnect'
                     : 'Disconnect Controller',
               ),

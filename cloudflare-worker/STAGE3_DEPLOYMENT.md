@@ -31,10 +31,20 @@ No resource has been deployed by this change. This checklist is not evidence tha
 
 ## EMQX and Cron
 
-1. In EMQX Dashboard, identify the exact cluster/region and whether the plan supports authenticated HTTPS publish. Do not use an MQTT listener URL as an HTTPS endpoint.
-2. Verify the HTTP API URL, TLS chain, authentication, publish schema and permissions for this specific deployment.
-3. Create a dedicated publisher identity restricted to `smartassist/{houseId}/controllers/{controllerId}/control`, with publish permission only.
-4. Implement and stage-test the HTTP adapter for denied publish, timeout, rate limiting and retry. Until this exists, `UnconfiguredMqttTransport` fails closed and Worker unpair requests remain pending. Do not enable production unpair cutover.
+1. The verified development API root is `https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5`; the optional publisher builds the request URL as exactly `/api/v5/publish`. Do not substitute the MQTT listener endpoint. HTTPS unpair polling is the critical controller command channel and does not depend on EMQX.
+2. For optional MQTT publishing, inspect the active Deployment API key in the EMQX Dashboard and confirm its permissions include `POST /api/v5/publish`. For Dedicated/Dedicated Flex, restrict the key to that method and path if supported. `EMQX_API_KEY` is the binding name for the Deployment App ID; `EMQX_API_SECRET` is the Deployment App Secret.
+3. The confirmed endpoint is configured in top-level Wrangler `[vars]` for the default/development Worker. Configure the two credential values as secrets in that same top-level environment. The production environment is separate and is not configured by this development endpoint change.
+4. Stage-test denied publish, timeout, `202 no_matching_subscribers`, and retries if optional MQTT is enabled. Do not treat MQTT publish acceptance as controller acknowledgement. Separately, stage-test authenticated HTTPS polling and prepare/commit acknowledgements with a real controller before any production cutover.
+
+From `cloudflare-worker`, the top-level/default development Worker secrets are configured with these commands (Wrangler prompts for each value; do not place values in command arguments or shell history):
+
+```text
+npx wrangler secret put EMQX_API_KEY
+npx wrangler secret put EMQX_API_SECRET
+npx wrangler secret list
+```
+
+Do not add `--env production` for the existing development deployment. `secret list` displays names only. The commands are documented here; they were not run because this verification must not change secrets.
 5. In **Workers & Pages → smartassist-api → Settings → Triggers → Cron Triggers**, verify the one-minute schedule for the selected environment; test retries/expiry against staging operations.
 
 ## Flutter configuration

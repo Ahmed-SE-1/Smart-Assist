@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "smartassist_main_controller",
-    "project_version":    "e1b92a8-dirty",
+    "project_version":    "e581dda-dirty",
     "project_path":       "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project",
     "idf_path":           "C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4",
     "build_dir":          "D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build",

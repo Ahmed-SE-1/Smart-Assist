@@ -8,6 +8,7 @@ workers_dev = true
 FIREBASE_PROJECT_ID = "smartassist-18d2a"
 MAX_REQUEST_BYTES = "16384"
 ENVIRONMENT = "development"
+EMQX_API_URL = "https://ab81af18.ala.asia-southeast1.emqxsl.com:8443/api/v5"
 
 [env.production]
 name = "smartassist-api-production"

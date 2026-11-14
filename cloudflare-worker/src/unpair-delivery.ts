@@ -7,12 +7,19 @@ export async function deliverUnpairOperation(args: {
   mqtt: MqttPublishTransport;
   logger: Logger;
   now: Date;
+  force?: boolean;
 }): Promise<boolean> {
   const operation = args.operation;
   const attempts = Number(operation.deliveryAttempts ?? 0);
   const delayMs = Math.min(5 * 60_000, 15_000 * 2 ** Math.min(attempts, 4));
-  const status = await recordUnpairDeliveryAttempt({ store: args.store,
-    operationId: String(operation.operationId), nextDeliveryAt: new Date(args.now.getTime() + delayMs), serverTimestamp: args.now });
+  const status = await recordUnpairDeliveryAttempt({
+    store: args.store,
+    operationId: String(operation.operationId),
+    nextDeliveryAt: new Date(args.now.getTime() + delayMs),
+    serverTimestamp: args.now,
+    now: args.now,
+    force: args.force,
+  });
   if (!status) return false;
   try {
     const houseId = String(operation.houseId ?? "");

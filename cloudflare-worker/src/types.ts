@@ -5,6 +5,9 @@ export interface Env {
   CORS_ALLOWED_ORIGINS?: string;
   MAX_REQUEST_BYTES?: string;
   ENVIRONMENT?: string;
+  EMQX_API_URL?: string;
+  EMQX_API_KEY?: string;
+  EMQX_API_SECRET?: string;
 }
 
 export interface PairingSnapshot { readonly exists: boolean; data(): Record<string, unknown> | undefined; }

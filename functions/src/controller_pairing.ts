@@ -46,6 +46,16 @@ export interface MainControllerUnpairOperation {
   [key: string]: unknown;
 }
 
+export interface MainControllerOperationCommand {
+  v: 1;
+  type: "unpair";
+  phase: "prepare" | "commit";
+  operationId: string;
+  houseId: string;
+  controllerId: string;
+  expiresAt: string;
+}
+
 export function hashPairingToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
@@ -137,6 +147,110 @@ export function validateControllerIdentityClaims(args: {
   }
 }
 
+/**
+ * Returns the durable command currently assigned to a controller. Polling is
+ * intentionally repeatable: a lost HTTPS response can be retried and the
+ * controller applies the same operation ID idempotently.
+ */
+export async function pollMainControllerOperation(args: {
+  store: PairingStore;
+  controllerId: string;
+  credentialGeneration: number;
+  now: Date;
+}): Promise<MainControllerOperationCommand | null> {
+  const controllerId = validateControllerId(args.controllerId);
+  return args.store.runTransaction(async (transaction) => {
+    const controllerRef = args.store.doc("controllers", controllerId);
+    const controllerSnapshot = await transaction.get(controllerRef);
+    const controller = controllerSnapshot.data();
+    if (!controllerSnapshot.exists || controller?.controllerId !== controllerId ||
+      controller.authCredentialStatus !== "active" ||
+      controller.authCredentialGeneration !== args.credentialGeneration ||
+      typeof controller.activeHouseId !== "string" || !controller.activeHouseId) {
+      throw new PairingError("permission-denied", "Controller identity is invalid or revoked.");
+    }
+
+    const houseId = validateHouseId(controller.activeHouseId);
+    const houseRef = args.store.doc("houses", houseId);
+    const houseSnapshot = await transaction.get(houseRef);
+    const house = houseSnapshot.data();
+    if (!houseSnapshot.exists || house?.houseId !== houseId ||
+      house.mainControllerId !== controllerId) {
+      throw new PairingError("failed-precondition", "Controller House assignment is no longer active.");
+    }
+
+    const lastSeenAt = dateMillis(controller.lastSeenAt);
+    if (!Number.isFinite(lastSeenAt) || args.now.getTime() - lastSeenAt >= 60_000) {
+      transaction.update(controllerRef, { lastSeenAt: args.now });
+    }
+
+    const operationId = controller.pendingUnpairOperationId;
+    if (operationId == null) {
+      if (house.pendingUnpairOperationId != null) {
+        throw new PairingError("failed-precondition", "Controller operation assignment is inconsistent.");
+      }
+      return null;
+    }
+    if (typeof operationId !== "string" || house.pendingUnpairOperationId !== operationId) {
+      throw new PairingError("failed-precondition", "Controller operation assignment is inconsistent.");
+    }
+
+    const operationRef = args.store.doc("controllerUnpairOperations", operationId);
+    const operationSnapshot = await transaction.get(operationRef);
+    const operation = operationSnapshot.data();
+    if (!operationSnapshot.exists || operation?.operationId !== operationId ||
+      operation.controllerId !== controllerId || operation.houseId !== houseId) {
+      throw new PairingError("failed-precondition", "Controller operation is invalid.");
+    }
+    const expiresAt = dateMillis(operation.expiresAt);
+    if (operation.status === "pending") {
+      if (!Number.isFinite(expiresAt) || expiresAt <= args.now.getTime()) return null;
+      const leaseUntil = dateMillis(operation.controllerPollLeaseUntil);
+      if (!Number.isFinite(leaseUntil) || leaseUntil <= args.now.getTime()) {
+        transaction.update(operationRef, {
+          controllerPollLeaseUntil: new Date(args.now.getTime() + 30_000),
+          deliveryAttempts: Number(operation.deliveryAttempts ?? 0) + 1,
+          lastDeliveryAt: args.now,
+          updatedAt: args.now,
+        });
+      }
+      return {
+        v: 1,
+        type: "unpair",
+        phase: "prepare",
+        operationId,
+        houseId,
+        controllerId,
+        expiresAt: new Date(expiresAt).toISOString(),
+      };
+    }
+    if (operation.status === "prepared") {
+      if (!Number.isFinite(expiresAt)) {
+        throw new PairingError("failed-precondition", "Controller operation expiry is invalid.");
+      }
+      const leaseUntil = dateMillis(operation.controllerPollLeaseUntil);
+      if (!Number.isFinite(leaseUntil) || leaseUntil <= args.now.getTime()) {
+        transaction.update(operationRef, {
+          controllerPollLeaseUntil: new Date(args.now.getTime() + 30_000),
+          deliveryAttempts: Number(operation.deliveryAttempts ?? 0) + 1,
+          lastDeliveryAt: args.now,
+          updatedAt: args.now,
+        });
+      }
+      return {
+        v: 1,
+        type: "unpair",
+        phase: "commit",
+        operationId,
+        houseId,
+        controllerId,
+        expiresAt: new Date(expiresAt).toISOString(),
+      };
+    }
+    return null;
+  });
+}
+
 function assertApprovedOwner(
   uid: string,
   houseId: string,
@@ -224,10 +338,13 @@ export async function claimMainController(args: {
     const houseRef = args.store.doc("houses", houseId);
     const userRef = args.store.doc("users", ownerUid);
     const controllerRef = args.store.doc("controllers", controllerId);
-    const ownerSnapshot = await transaction.get(userRef);
-    const houseSnapshot = await transaction.get(houseRef);
-    const controllerSnapshot = await transaction.get(controllerRef);
-    const recoverySnapshot = await transaction.get(recoveryRef);
+    const [ownerSnapshot, houseSnapshot, controllerSnapshot, recoverySnapshot] =
+      await Promise.all([
+        transaction.get(userRef),
+        transaction.get(houseRef),
+        transaction.get(controllerRef),
+        transaction.get(recoveryRef),
+      ]);
     const house = houseSnapshot.data();
     const controller = controllerSnapshot.data();
     assertApprovedOwner(ownerUid, houseId, ownerSnapshot.data(), house);
@@ -339,7 +456,7 @@ export async function recoverMainControllerCredential(args: {
   recoverySecret: string;
   controllerId: string;
   now: Date;
-}): Promise<{ houseId: string; controllerId: string; credentialGeneration: number }> {
+}): Promise<{ houseId: string; controllerId: string; credentialGeneration: number; rotateGeneration: boolean }> {
   const controllerId = validateControllerId(args.controllerId);
   const secretHash = hashControllerRecoverySecret(args.recoverySecret);
   const recoveryRef = args.store.doc("controllerCredentialRecoverySessions", secretHash);
@@ -353,21 +470,28 @@ export async function recoverMainControllerCredential(args: {
     const recovery = recoverySnapshot.data();
     const controller = controllerSnapshot.data();
     const expiresAt = dateMillis(recovery?.expiresAt);
+    const expectedGeneration = controller
+      ? nextControllerCredentialGeneration(controller.authCredentialGeneration, controller.authCredentialStatus)
+      : 0;
+    const currentGeneration = Number.isInteger(controller?.authCredentialGeneration)
+      ? Number(controller?.authCredentialGeneration) : 0;
+    const rotateGeneration = controller?.pairingReadiness !== "cloud_ready" &&
+      (controller?.authCredentialStatus === "active" || controller?.authCredentialStatus === "provisioning") &&
+      recovery?.credentialGeneration === currentGeneration + 1;
     if (!recoverySnapshot.exists || !controllerSnapshot.exists ||
       recovery?.secretHash !== secretHash || recovery.controllerId !== controllerId ||
       typeof recovery.houseId !== "string" || !Number.isInteger(recovery.credentialGeneration) ||
       !Number.isFinite(expiresAt) || expiresAt <= args.now.getTime() ||
       controller?.controllerId !== controllerId || controller.activeHouseId !== recovery.houseId ||
-      nextControllerCredentialGeneration(
-        controller.authCredentialGeneration,
-        controller.authCredentialStatus,
-      ) !== recovery.credentialGeneration || controller.pendingUnpairOperationId != null) {
+      (expectedGeneration !== recovery.credentialGeneration && !rotateGeneration) ||
+      controller.pendingUnpairOperationId != null) {
       throw new PairingError("permission-denied", "Controller recovery authorization is invalid or expired.");
     }
     return {
       houseId: recovery.houseId,
       controllerId,
       credentialGeneration: recovery.credentialGeneration as number,
+      rotateGeneration,
     };
   });
 }
@@ -402,24 +526,38 @@ export async function createControllerIdentityMigrationSession(args: {
     if (
       !controllerSnapshot.exists || house?.mainControllerId !== controllerId ||
       controller?.activeHouseId !== houseId ||
+      controller?.pendingUnpairOperationId != null ||
       house?.pendingUnpairOperationId != null
     ) {
       throw new PairingError("failed-precondition", "The controller is not available for identity migration.");
     }
-    if (controller?.authCredentialStatus === "active") {
-      throw new PairingError("already-exists", "This controller already has a Firebase identity.");
+    if (controller?.authCredentialStatus === "active" &&
+      controller.pairingReadiness === "cloud_ready") {
+      throw new PairingError("already-exists", "This controller already has a ready Firebase identity.");
+    }
+    const migrationExpiry = dateMillis(controller?.identityMigrationExpiresAt);
+    if (typeof controller?.identityMigrationTokenHash === "string" &&
+      controller.identityMigrationTokenHash.length > 0 && migrationExpiry > args.now.getTime()) {
+      throw new PairingError("already-exists", "An identity migration is already pending for this controller.");
     }
     if (sessionSnapshot.exists) {
       throw new PairingError("already-exists", "Identity migration session could not be created.");
     }
+    const currentGeneration = Number.isInteger(controller.authCredentialGeneration)
+      ? Number(controller.authCredentialGeneration) : 0;
     transaction.create(sessionRef, {
       tokenHash,
       ownerUid: args.uid,
       houseId,
       controllerId,
+      credentialGeneration: currentGeneration + 1,
       createdAt: args.serverTimestamp,
       expiresAt,
       consumedAt: null,
+    });
+    transaction.update(controllerRef, {
+      identityMigrationTokenHash: tokenHash,
+      identityMigrationExpiresAt: expiresAt,
     });
   });
   return { houseId, controllerId, expiresAt };
@@ -429,13 +567,16 @@ export async function consumeControllerIdentityMigrationSession(args: {
   store: PairingStore;
   token: string;
   controllerId: string;
+  recoverySecret: string;
   now: Date;
   serverTimestamp: unknown;
-}): Promise<{ houseId: string; controllerId: string; ownerUid: string }> {
+}): Promise<{ houseId: string; controllerId: string; ownerUid: string; credentialGeneration: number }> {
   const token = validatePairingToken(args.token);
   const controllerId = validateControllerId(args.controllerId);
+  const recoverySecretHash = hashControllerRecoverySecret(args.recoverySecret);
   const tokenHash = hashPairingToken(token);
   const sessionRef = args.store.doc("controllerIdentityMigrationSessions", tokenHash);
+  const recoveryRef = args.store.doc("controllerCredentialRecoverySessions", recoverySecretHash);
   return args.store.runTransaction(async (transaction) => {
     const sessionSnapshot = await transaction.get(sessionRef);
     const session = sessionSnapshot.data();
@@ -448,9 +589,10 @@ export async function consumeControllerIdentityMigrationSession(args: {
     const userRef = args.store.doc("users", ownerUid);
     const houseRef = args.store.doc("houses", houseId);
     const controllerRef = args.store.doc("controllers", controllerId);
-    const userSnapshot = await transaction.get(userRef);
-    const houseSnapshot = await transaction.get(houseRef);
-    const controllerSnapshot = await transaction.get(controllerRef);
+    const [userSnapshot, houseSnapshot, controllerSnapshot, recoverySnapshot] = await Promise.all([
+      transaction.get(userRef), transaction.get(houseRef), transaction.get(controllerRef),
+      transaction.get(recoveryRef),
+    ]);
     const house = houseSnapshot.data();
     const controller = controllerSnapshot.data();
     assertApprovedOwner(ownerUid, houseId, userSnapshot.data(), house);
@@ -458,20 +600,53 @@ export async function consumeControllerIdentityMigrationSession(args: {
     if (
       !Number.isFinite(expiryMillis) || expiryMillis <= args.now.getTime() ||
       !controllerSnapshot.exists || house?.mainControllerId !== controllerId ||
-      controller?.activeHouseId !== houseId || house?.pendingUnpairOperationId != null
+      controller?.activeHouseId !== houseId || controller?.pendingUnpairOperationId != null ||
+      house?.pendingUnpairOperationId != null ||
+      controller?.identityMigrationTokenHash !== tokenHash
     ) {
       throw new PairingError("permission-denied", "Identity migration token is invalid or expired.");
     }
-    if (session.consumedAt != null && session.consumedControllerId !== controllerId) {
+    if (session.consumedAt != null && (
+      session.consumedControllerId !== controllerId ||
+      dateMillis(session.recoveryExpiresAt) <= args.now.getTime()
+    )) {
       throw new PairingError("failed-precondition", "Identity migration token was already used.");
+    }
+    const generation = Number(session.credentialGeneration);
+    const currentGeneration = Number.isInteger(controller.authCredentialGeneration)
+      ? Number(controller.authCredentialGeneration) : 0;
+    const canStartRotation = generation === currentGeneration + 1;
+    const canResumeRotation = generation === currentGeneration &&
+      (controller.authCredentialStatus === "provisioning" ||
+        controller.authCredentialStatus === "active") &&
+      controller.pairingReadiness !== "cloud_ready";
+    if (!Number.isInteger(generation) || (!canStartRotation && !canResumeRotation)) {
+      throw new PairingError("failed-precondition", "Controller identity changed during migration.");
+    }
+    if (recoverySnapshot.exists) {
+      const recovery = recoverySnapshot.data();
+      if (recovery?.secretHash !== recoverySecretHash || recovery.controllerId !== controllerId ||
+        recovery.houseId !== houseId || recovery.credentialGeneration !== generation) {
+        throw new PairingError("failed-precondition", "Recovery authorization is already in use.");
+      }
+    } else {
+      transaction.create(recoveryRef, {
+        secretHash: recoverySecretHash,
+        controllerId,
+        houseId,
+        credentialGeneration: generation,
+        expiresAt: new Date(args.now.getTime() + 10 * 60 * 1000),
+        createdAt: args.serverTimestamp,
+      });
     }
     if (session.consumedAt == null) {
       transaction.update(sessionRef, {
         consumedAt: args.serverTimestamp,
         consumedControllerId: controllerId,
+        recoveryExpiresAt: new Date(args.now.getTime() + 10 * 60 * 1000),
       });
     }
-    return { houseId, controllerId, ownerUid };
+    return { houseId, controllerId, ownerUid, credentialGeneration: generation };
   });
 }
 
@@ -556,6 +731,7 @@ export async function requestMainControllerUnpair(args: {
       expiresAt: args.expiresAt,
       status: "pending",
       deliveryAttempts: 0,
+      controllerPollLeaseUntil: null,
       nextDeliveryAt: args.now,
     };
     transaction.create(operationRef, operation);
@@ -616,10 +792,12 @@ async function acknowledgeUnpair(
       return operation as unknown as MainControllerUnpairOperation;
     }
     const duplicatePrepared = target === "prepared" && operation.status === "prepared";
-    if (operation.status === "failed") {
+    const recoverExpiredPreparation = target === "prepared" && operation.status === "failed" &&
+      operation.failureCode === "expired";
+    if (operation.status === "failed" && !recoverExpiredPreparation) {
       throw new PairingError("failed-precondition", "Unpair operation is no longer active.");
     }
-    if ((target === "prepared" && operation.status !== "pending" && !duplicatePrepared) ||
+    if ((target === "prepared" && operation.status !== "pending" && !duplicatePrepared && !recoverExpiredPreparation) ||
       (target === "completed" && operation.status !== "prepared")) {
       throw new PairingError("failed-precondition", "Unpair acknowledgement is out of order.");
     }
@@ -636,11 +814,29 @@ async function acknowledgeUnpair(
     const controllerSnapshot = await transaction.get(controllerRef);
     const house = houseSnapshot.data();
     const controller = controllerSnapshot.data();
+    const validExpiredRecovery = recoverExpiredPreparation &&
+      house?.lastUnpairOperationId === args.operationId &&
+      (house?.pendingUnpairOperationId == null || house.pendingUnpairOperationId === args.operationId) &&
+      (controller?.pendingUnpairOperationId == null || controller.pendingUnpairOperationId === args.operationId);
     if (!houseSnapshot.exists || !controllerSnapshot.exists ||
       house?.mainControllerId !== controllerId || controller?.activeHouseId !== houseId ||
-      house?.pendingUnpairOperationId !== args.operationId ||
-      controller?.pendingUnpairOperationId !== args.operationId) {
+      (!validExpiredRecovery && (house?.pendingUnpairOperationId !== args.operationId ||
+        controller?.pendingUnpairOperationId !== args.operationId))) {
       throw new PairingError("failed-precondition", "Unpair registry assignment changed.");
+    }
+
+    if (recoverExpiredPreparation) {
+      transaction.update(operationRef, {
+        status: "prepared",
+        failureCode: null,
+        preparedAt: args.serverTimestamp,
+        deliveryLeaseUntil: null,
+        nextDeliveryAt: args.now,
+        updatedAt: args.serverTimestamp,
+      });
+      transaction.update(houseRef, { pendingUnpairOperationId: args.operationId, updatedAt: args.serverTimestamp });
+      transaction.update(controllerRef, { pendingUnpairOperationId: args.operationId, status: "unpair_prepared" });
+      return { ...operation, status: "prepared" } as unknown as MainControllerUnpairOperation;
     }
 
     if (duplicatePrepared) {
@@ -651,6 +847,8 @@ async function acknowledgeUnpair(
       transaction.update(operationRef, {
         status: "prepared",
         preparedAt: args.serverTimestamp,
+        deliveryLeaseUntil: null,
+        controllerPollLeaseUntil: null,
         updatedAt: args.serverTimestamp,
         nextDeliveryAt: args.now,
       });
@@ -673,6 +871,7 @@ async function acknowledgeUnpair(
     transaction.update(operationRef, {
       status: "completed",
       completedAt: args.serverTimestamp,
+      controllerPollLeaseUntil: null,
       updatedAt: args.serverTimestamp,
     });
     return { ...operation, status: "completed" } as unknown as MainControllerUnpairOperation;
@@ -717,6 +916,8 @@ export async function recordUnpairDeliveryAttempt(args: {
   operationId: string;
   nextDeliveryAt: Date;
   serverTimestamp: unknown;
+  now: Date;
+  force?: boolean;
 }): Promise<UnpairStatus | null> {
   validateUnpairOperationId(args.operationId);
   const operationRef = args.store.doc("controllerUnpairOperations", args.operationId);
@@ -726,10 +927,18 @@ export async function recordUnpairDeliveryAttempt(args: {
     if (!snapshot.exists || (operation?.status !== "pending" && operation?.status !== "prepared")) {
       return null;
     }
+    const nowMillis = args.now.getTime();
+    const leaseUntil = dateMillis(operation.deliveryLeaseUntil);
+    if (!Number.isNaN(leaseUntil) && leaseUntil > nowMillis) return null;
+    const nextAt = dateMillis(operation.nextDeliveryAt);
+    if (!args.force && !Number.isNaN(nextAt) && nextAt > nowMillis) {
+      return null;
+    }
     transaction.update(operationRef, {
       deliveryAttempts: Number(operation.deliveryAttempts ?? 0) + 1,
       lastDeliveryAt: args.serverTimestamp,
       nextDeliveryAt: args.nextDeliveryAt,
+      deliveryLeaseUntil: new Date(nowMillis + 30_000),
       updatedAt: args.serverTimestamp,
     });
     return operation.status;

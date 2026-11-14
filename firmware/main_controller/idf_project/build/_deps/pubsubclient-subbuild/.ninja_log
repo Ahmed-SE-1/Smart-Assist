@@ -1,29 +1,13 @@
 # ninja log v5
 0	109	8159356427656388	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-mkdir	82789e048fb6c656
-215	274	8163023324906157	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
+361	453	8163023701504067	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
 110	10340	8159356528802386	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-download	b0fb4f97716c63b
 0	109	8159356427656388	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-mkdir	82789e048fb6c656
-0	149	0	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
-150	215	8163023324323450	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
-110	10340	8159356528802386	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-download	b0fb4f97716c63b
-150	215	8163023324323450	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
-0	149	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
-215	274	8163023324906157	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
-274	337	8163023325549938	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
-274	337	8163023325549938	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
-337	401	8163023326184098	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-install	45108011d3d06771
-337	401	8163023326184098	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-install	45108011d3d06771
-401	469	8163023326851124	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-test	f9ac7fce5a327487
-401	469	8163023326851124	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-test	f9ac7fce5a327487
-469	560	8163023327764783	CMakeFiles/pubsubclient-populate-complete	f61cbf3a08b0825f
-469	560	8163023327764783	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f
-469	560	8163023327764783	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate-complete	f61cbf3a08b0825f
-469	560	8163023327764783	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f
 0	271	0	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
-0	271	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
 272	361	8163023700572991	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
+110	10340	8159356528802386	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-download	b0fb4f97716c63b
 272	361	8163023700572991	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
-361	453	8163023701504067	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
+0	271	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
 361	453	8163023701504067	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
 453	540	8163023702358865	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
 453	540	8163023702358865	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
@@ -35,3 +19,19 @@
 708	821	8163023705184457	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f
 708	821	8163023705184457	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate-complete	f61cbf3a08b0825f
 708	821	8163023705184457	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f
+1	232	0	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
+1	232	0	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-update	fe13e25b39fd51ee
+233	301	8163607769339177	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
+233	301	8163607769339177	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-patch	4ad9f17ef6ed4bde
+301	368	8163607769985712	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
+301	368	8163607769985712	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-configure	f1bbddeb2b3efd45
+368	457	8163607770810056	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
+368	457	8163607770810056	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-build	4a05d471a5474fdc
+457	580	8163607772060704	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-install	45108011d3d06771
+457	580	8163607772060704	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-install	45108011d3d06771
+580	690	8163607773205630	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-test	f9ac7fce5a327487
+580	690	8163607773205630	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-test	f9ac7fce5a327487
+690	848	8163607774695214	CMakeFiles/pubsubclient-populate-complete	f61cbf3a08b0825f
+690	848	8163607774695214	pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f
+690	848	8163607774695214	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/CMakeFiles/pubsubclient-populate-complete	f61cbf3a08b0825f
+690	848	8163607774695214	D:/Ahmed/SmartAssist-FYP/SmartAssist App/Smart-Assist/firmware/main_controller/idf_project/build/_deps/pubsubclient-subbuild/pubsubclient-populate-prefix/src/pubsubclient-populate-stamp/pubsubclient-populate-done	f61cbf3a08b0825f

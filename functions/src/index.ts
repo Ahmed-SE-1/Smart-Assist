@@ -457,7 +457,7 @@ async function requireUnpairOperationOwner(
   }
 }
 
-async function publishUnpairOperation(operationId: string): Promise<void> {
+async function publishUnpairOperation(operationId: string, force = false): Promise<void> {
   const operationRef = getFirestore().collection("controllerUnpairOperations").doc(operationId);
   const snapshot = await operationRef.get();
   const operation = snapshot.data();
@@ -472,6 +472,8 @@ async function publishUnpairOperation(operationId: string): Promise<void> {
     operationId,
     nextDeliveryAt: new Date(now.getTime() + delayMs),
     serverTimestamp: FieldValue.serverTimestamp(),
+    now,
+    force,
   });
   if (!status) return;
 
@@ -649,7 +651,7 @@ export const retryMainControllerUnpair = onCall(
       throw new HttpsError("failed-precondition", "Unpair operation is not retryable.");
     }
     try {
-      await publishUnpairOperation(operationId);
+      await publishUnpairOperation(operationId, true);
     } catch (error) {
       logger.warn("Manual Main Controller unpair retry failed", {
         operationId,

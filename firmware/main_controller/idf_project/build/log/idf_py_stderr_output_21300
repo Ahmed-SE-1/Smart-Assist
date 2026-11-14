@@ -1,0 +1,7 @@
+--- WARNING: GDB cannot open serial ports accessed as COMx
+--- NOTE: Using \\.\COM10 instead...
+--- esp-idf-monitor 1.10.0 on \\.\COM10 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+--- 0x40080400: _init at ??:?
+--- 0x400814ec: call_start_cpu1 at C:/Users/LAPTOPS LOUNGE/esp/esp-idf-v5.1.4/components/esp_system/port/cpu_start.c:159
+

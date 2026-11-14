@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
 import {
   acknowledgeMainControllerUnpairCompleted, acknowledgeMainControllerUnpairPrepared,
-  claimMainController, controllerFirebaseAuthUid, createPairingSession,
+  claimMainController, consumeControllerIdentityMigrationSession,
+  controllerFirebaseAuthUid, createControllerIdentityMigrationSession, createPairingSession,
   expireMainControllerUnpair, nextControllerCredentialGeneration,
+  pollMainControllerOperation,
   recoverMainControllerCredential,
   requestMainControllerUnpair, validateControllerId, validateControllerIdentityClaims,
   validateMacDerivedControllerId, validateUnpairOperationId,
@@ -13,9 +15,36 @@ import { FirestoreRestStore } from "./firestore-rest.ts";
 import { GoogleAdminAuth } from "./google-auth.ts";
 import { FirebaseIdTokenVerifier } from "./firebase-id-token.ts";
 import { createLogger } from "./logging.ts";
-import { UnconfiguredMqttTransport } from "./mqtt-adapter.ts";
-import { deliverUnpairOperation } from "./unpair-delivery.ts";
 import type { Env, FirebaseIdClaims } from "./types.ts";
+
+export async function fetchAllRowsByStatus(
+  store: Pick<FirestoreRestStore, "query">,
+  projectId: string,
+  status: string,
+): Promise<Array<{ id: string; data: any }>> {
+  const all: Array<{ id: string; data: any }> = [];
+  let cursor: string | undefined;
+  const limit = 100;
+  while (true) {
+    const structuredQuery: Record<string, unknown> = {
+      where: { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: status } } },
+      orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }],
+      limit,
+    };
+    if (cursor) {
+      structuredQuery.startAt = {
+        values: [{ referenceValue: `projects/${projectId}/databases/(default)/documents/controllerUnpairOperations/${encodeURIComponent(cursor)}` }],
+        before: false,
+      };
+    }
+    const rows = await store.query("controllerUnpairOperations", structuredQuery);
+    if (rows.length === 0) break;
+    all.push(...rows);
+    if (rows.length < limit) break;
+    cursor = rows[rows.length - 1].id;
+  }
+  return all;
+}
 
 const logger = createLogger((level, entry) => console[level === "error" ? "error" : level === "warn" ? "warn" : "log"](JSON.stringify(entry)));
 const MAX_BODY_DEFAULT = 16_384;
@@ -50,20 +79,98 @@ export default {
         const result = await createPairingSession({ store, uid: identity.sub, houseId, token, now, serverTimestamp });
         return json({ ...result, expiresAt: result.expiresAt.toISOString(), token }, 200, cors);
       }
+      if (path === "/v1/controller/identity-migration-sessions" && request.method === "POST") {
+        const identity = await requireUser(request, verifier, auth);
+        const houseId = requiredString(input.houseId, "houseId");
+        const controllerId = validateMacDerivedControllerId(input.controllerId);
+        const token = randomBytes(32).toString("base64url");
+        const result = await createControllerIdentityMigrationSession({
+          store,
+          uid: identity.sub,
+          houseId,
+          controllerId,
+          token,
+          now,
+          serverTimestamp,
+        });
+        return json({ ...result, expiresAt: result.expiresAt.toISOString(), token }, 200, cors);
+      }
       if (path === "/v1/controller/claims" && request.method === "POST") {
         const token = requiredString(input.token, "token");
         const controllerId = validateMacDerivedControllerId(input.controllerId);
         const recoverySecret = requiredString(input.recoverySecret, "recoverySecret");
         const result = await claimMainController({ store, token, controllerId, recoverySecret, now, serverTimestamp });
         const deviceCredential = await provision(store, auth, result.houseId, controllerId);
-        return json({ ...result, status: "paired", deviceCredential }, 200, cors);
+        return json({ houseId: result.houseId, controllerId, status: "paired", deviceCredential }, 200, cors);
+      }
+      if (path === "/v1/controller/identity/migrate" && request.method === "POST") {
+        const token = requiredString(input.token, "token");
+        const controllerId = validateMacDerivedControllerId(input.controllerId);
+        const recoverySecret = requiredString(input.recoverySecret, "recoverySecret");
+        const result = await consumeControllerIdentityMigrationSession({
+          store,
+          token,
+          controllerId,
+          recoverySecret,
+          now,
+          serverTimestamp,
+        });
+        const deviceCredential = await provision(store, auth, result.houseId, controllerId, result.credentialGeneration, true);
+        return json({ houseId: result.houseId, controllerId, status: "paired", deviceCredential }, 200, cors);
       }
       if (path === "/v1/controller/credentials/recover" && request.method === "POST") {
         const recoverySecret = requiredString(input.recoverySecret, "recoverySecret");
         const controllerId = validateMacDerivedControllerId(input.controllerId);
         const result = await recoverMainControllerCredential({ store, recoverySecret, controllerId, now });
-        const deviceCredential = await provision(store, auth, result.houseId, controllerId, result.credentialGeneration);
+        const deviceCredential = await provision(
+          store, auth, result.houseId, controllerId, result.credentialGeneration,
+          result.rotateGeneration,
+        );
         return json({ status: "paired", ...result, deviceCredential }, 200, cors);
+      }
+      if (path === "/v1/controller/readiness" && request.method === "POST") {
+        const controllerId = validateMacDerivedControllerId(input.controllerId);
+        const identity = await requireControllerIdentity(request, verifier, auth, store, controllerId, now);
+        if (input.storageMode !== "encrypted_nvs") {
+          throw new ApiError("failed-precondition", "Controller secure storage is not ready.");
+        }
+        const houseId = identity.houseId;
+        await store.runTransaction(async tx => {
+          const controllerRef = store.doc("controllers", controllerId);
+          const houseRef = store.doc("houses", houseId);
+          const controllerSnapshot = await tx.get(controllerRef);
+          const houseSnapshot = await tx.get(houseRef);
+          const controller = controllerSnapshot.data();
+          const house = houseSnapshot.data();
+          if (!controllerSnapshot.exists || !houseSnapshot.exists ||
+            controller?.activeHouseId !== houseId || controller.controllerId !== controllerId ||
+            controller.authCredentialGeneration !== identity.generation ||
+            controller.authCredentialStatus !== "active" ||
+            controller.pendingUnpairOperationId != null ||
+            house?.mainControllerId !== controllerId || house.pendingUnpairOperationId != null) {
+            throw new ApiError("failed-precondition", "Controller pairing changed before readiness confirmation.");
+          }
+          tx.update(controllerRef, {
+            pairingReadiness: "cloud_ready",
+            pairingGeneration: identity.generation,
+            lastSeenAt: now,
+            cloudReadyAt: now,
+            identityMigrationTokenHash: null,
+            identityMigrationExpiresAt: null,
+          });
+        });
+        return json({ status: "cloud_ready", controllerId, houseId, credentialGeneration: identity.generation }, 200, cors);
+      }
+      if (path === "/v1/controller/operations/poll" && request.method === "POST") {
+        const controllerId = validateMacDerivedControllerId(input.controllerId);
+        const identity = await requireControllerIdentity(request, verifier, auth, store, controllerId, now);
+        const operation = await pollMainControllerOperation({
+          store,
+          controllerId,
+          credentialGeneration: identity.generation,
+          now,
+        });
+        return json({ operation }, 200, cors);
       }
       if (path === "/v1/controller/unpair-operations" && request.method === "POST") {
         const identity = await requireUser(request, verifier, auth);
@@ -72,7 +179,6 @@ export default {
         const operation = await requestMainControllerUnpair({ store, uid: identity.sub, houseId, controllerId,
           operationId: randomBytes(24).toString("base64url"), now,
           expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000), serverTimestamp });
-        await deliverUnpairOperation({ store, operation, mqtt: new UnconfiguredMqttTransport(), logger, now });
         return json(publicOperation(operation), 200, cors);
       }
       const match = path.match(/^\/v1\/controller\/unpair-operations\/([A-Za-z0-9_-]{32,64})(?:\/(retry|prepared|completed))?$/);
@@ -92,7 +198,6 @@ export default {
           if (!operation) throw new ApiError("not-found", "Unpair operation was not found.");
           await assertOwner(store, identity.sub, String(operation.houseId ?? ""));
           if (operation.status !== "pending" && operation.status !== "prepared") throw new ApiError("failed-precondition", "Unpair operation is not retryable.");
-          await deliverUnpairOperation({ store, operation: { ...operation, operationId }, mqtt: new UnconfiguredMqttTransport(), logger, now });
           return json(publicOperation((await store.get("controllerUnpairOperations", operationId)) ?? operation), 200, cors);
         }
         if (action === "prepared" || action === "completed") {
@@ -104,7 +209,6 @@ export default {
           const result = action === "prepared"
             ? await acknowledgeMainControllerUnpairPrepared(args)
             : await acknowledgeMainControllerUnpairCompleted(args);
-          if (action === "prepared") await deliverUnpairOperation({ store, operation: result as unknown as Record<string, unknown>, mqtt: new UnconfiguredMqttTransport(), logger, now });
           return json(publicOperation(result), 200, cors);
         }
       }
@@ -119,35 +223,29 @@ export default {
   async scheduled(_event: ScheduledEventLike, env: Env): Promise<void> {
     let stage = "initialization";
     try {
-    logger.info("scheduled_unpair_sweep_started", { stage });
-    const google = new GoogleAdminAuth(env);
-    const store = new FirestoreRestStore(env.FIREBASE_PROJECT_ID, google);
-    const mqtt = new UnconfiguredMqttTransport();
-    const now = new Date();
-    stage = "due_query";
-    const due = await store.query("controllerUnpairOperations", { where: { compositeFilter: { op: "AND", filters: [
-      { fieldFilter: { field: { fieldPath: "status" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "pending" }, { stringValue: "prepared" }] } } } },
-      { fieldFilter: { field: { fieldPath: "nextDeliveryAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
-    ] } }, limit: 100 });
-    stage = "due_processing";
-    for (const row of due) {
-      const op = row.data;
-      const expiresAt = op.expiresAt instanceof Date ? op.expiresAt.getTime() : Number.NaN;
-      const nextAt = op.nextDeliveryAt instanceof Date ? op.nextDeliveryAt.getTime() : 0;
-      if (op.status === "pending" && expiresAt <= now.getTime()) {
+      logger.info("scheduled_unpair_sweep_started", { stage });
+      const google = new GoogleAdminAuth(env);
+      const store = new FirestoreRestStore(env.FIREBASE_PROJECT_ID, google);
+      const now = new Date();
+
+      // HTTPS controller polling is the critical delivery channel. The scheduled
+      // sweep only expires unprepared operations; prepared operations remain
+      // durable and retryable until the controller polls and commits them.
+      stage = "due_query";
+      const pendingRows = await fetchAllRowsByStatus(store, env.FIREBASE_PROJECT_ID, "pending");
+
+      // Sweep any remaining pending operations that have expired
+      stage = "expired_processing";
+      const expired = pendingRows.filter(row => {
+        const op = row.data;
+        return op.expiresAt instanceof Date && op.expiresAt.getTime() <= now.getTime();
+      });
+      for (const row of expired) {
+        // Idempotently check / ensure expired
         await expireMainControllerUnpair({ store, operationId: row.id, now, serverTimestamp: now });
-      } else if (nextAt <= now.getTime()) await deliverUnpairOperation({ store, operation: { ...op, operationId: row.id }, mqtt, logger, now });
-    }
-    stage = "expired_query";
-    const expired = await store.query("controllerUnpairOperations", { where: { compositeFilter: { op: "AND", filters: [
-      { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "pending" } } },
-      { fieldFilter: { field: { fieldPath: "expiresAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: now.toISOString() } } },
-    ] } }, limit: 100 });
-    stage = "expiration_processing";
-    for (const row of expired) if (row.data.expiresAt instanceof Date && row.data.expiresAt <= now) {
-      await expireMainControllerUnpair({ store, operationId: row.id, now, serverTimestamp: now });
-    }
-    logger.info("scheduled_unpair_sweep_completed", { dueCount: due.length, expiredCount: expired.length });
+      }
+
+      logger.info("scheduled_unpair_sweep_completed", { pendingCount: pendingRows.length, expiredCount: expired.length });
     } catch (error) {
       logger.error("scheduled_unpair_sweep_failed", {
         stage,
@@ -168,6 +266,36 @@ async function requireToken(request: Request, verifier: FirebaseIdTokenVerifier)
   if (!match) throw new ApiError("unauthenticated", "A Firebase ID token is required.");
   return verifier.verify(match[1]);
 }
+async function requireControllerIdentity(
+  request: Request,
+  verifier: FirebaseIdTokenVerifier,
+  auth: FirebaseAuthAdmin,
+  store: FirestoreRestStore,
+  controllerId: string,
+  now: Date,
+): Promise<{ generation: number; houseId: string }> {
+  const claims = await requireToken(request, verifier);
+  const expectedUid = controllerFirebaseAuthUid(controllerId);
+  const [controller, account] = await Promise.all([
+    store.get("controllers", controllerId),
+    auth.getUser(expectedUid),
+  ]);
+  const generation = Number(controller?.authCredentialGeneration);
+  const houseId = typeof controller?.activeHouseId === "string" ? controller.activeHouseId : "";
+  if (!controller || !account || account.disabled || claims.sub !== expectedUid ||
+    !Number.isInteger(generation) || generation <= 0 ||
+    controller.controllerId !== controllerId || controller.authCredentialStatus !== "active" ||
+    !houseId || claims.deviceType !== "main-controller" ||
+    claims.controllerId !== controllerId || claims.credentialGeneration !== generation ||
+    account.customClaims.deviceType !== "main-controller" ||
+    account.customClaims.controllerId !== controllerId ||
+    account.customClaims.credentialGeneration !== generation ||
+    typeof claims.auth_time !== "number" || claims.auth_time < account.validSinceSeconds ||
+    typeof claims.exp !== "number" || claims.exp <= Math.floor(now.getTime() / 1000)) {
+    throw new ApiError("permission-denied", "Controller identity is invalid or revoked.");
+  }
+  return { generation, houseId };
+}
 async function requireDevice(request: Request, verifier: FirebaseIdTokenVerifier, auth: FirebaseAuthAdmin, controllerId: string, operationId: string, store: FirestoreRestStore, now: Date): Promise<FirebaseIdClaims> {
   const claims = await requireToken(request, verifier);
   const controller = await store.get("controllers", controllerId);
@@ -183,40 +311,80 @@ async function requireDevice(request: Request, verifier: FirebaseIdTokenVerifier
   return claims;
 }
 async function assertOwner(store: FirestoreRestStore, uid: string, houseId: string): Promise<void> {
-  const user = await store.get("users", uid);
-  const house = await store.get("houses", houseId);
+  const [user, house] = await Promise.all([
+    store.get("users", uid),
+    store.get("houses", houseId),
+  ]);
   if (!user || user.id !== uid || user.role !== "owner" || user.houseId !== houseId || user.isApproved !== true || !house || house.houseId !== houseId || house.ownerUid !== uid) {
     throw new ApiError("permission-denied", "Approved House owner access is required.");
   }
 }
-async function provision(store: FirestoreRestStore, auth: FirebaseAuthAdmin, houseId: string, controllerId: string, expectedGeneration?: number) {
-  const controller = await store.get("controllers", controllerId);
-  if (!controller || controller.activeHouseId !== houseId || controller.controllerId !== controllerId || controller.pendingUnpairOperationId != null) throw new ApiError("failed-precondition", "Controller assignment changed during provisioning.");
+async function provision(store: FirestoreRestStore, auth: FirebaseAuthAdmin, houseId: string, controllerId: string, expectedGeneration?: number, rotateGeneration = false) {
   const uid = controllerFirebaseAuthUid(controllerId);
-  let account = await auth.getUser(uid);
+  const [controller, existingAccount] = await Promise.all([
+    store.get("controllers", controllerId),
+    auth.getUser(uid),
+  ]);
+  if (!controller || controller.activeHouseId !== houseId || controller.controllerId !== controllerId || controller.pendingUnpairOperationId != null) throw new ApiError("failed-precondition", "Controller assignment changed during provisioning.");
+  let account = existingAccount;
   if (!account) account = await auth.createUser(uid);
   if (Object.keys(account.customClaims).length > 0 &&
     (account.customClaims.deviceType !== "main-controller" || account.customClaims.controllerId !== controllerId)) {
     throw new ApiError("already-exists", "Controller identity account has conflicting claims.");
   }
-  const generation = nextControllerCredentialGeneration(controller.authCredentialGeneration, controller.authCredentialStatus);
+  const currentGeneration = Number.isInteger(controller.authCredentialGeneration)
+    ? Number(controller.authCredentialGeneration) : 0;
+  const generation = rotateGeneration && expectedGeneration != null
+    ? expectedGeneration
+    : nextControllerCredentialGeneration(controller.authCredentialGeneration, controller.authCredentialStatus);
+  if (rotateGeneration && expectedGeneration != null) {
+    const canStartRotation = generation === currentGeneration + 1;
+    const canResumeRotation = generation === currentGeneration &&
+      (controller.authCredentialStatus === "provisioning" || controller.authCredentialStatus === "active") &&
+      controller.pairingReadiness !== "cloud_ready";
+    if (!canStartRotation && !canResumeRotation) throw new ApiError("failed-precondition", "Controller identity changed during migration.");
+  }
   if (expectedGeneration != null && expectedGeneration !== generation) throw new ApiError("failed-precondition", "Controller credential generation changed during recovery.");
   await store.runTransaction(async tx => {
     const ref = store.doc("controllers", controllerId);
     const current = await tx.get(ref);
     const data = current.data();
     if (!current.exists || data?.activeHouseId !== houseId || data?.controllerId !== controllerId || data.pendingUnpairOperationId != null) throw new ApiError("failed-precondition", "Controller assignment changed during provisioning.");
-    tx.update(ref, { firebaseAuthUid: uid, authCredentialGeneration: generation, authCredentialStatus: "provisioning" });
+    if (rotateGeneration) {
+      const currentGeneration = Number.isInteger(data.authCredentialGeneration) ? Number(data.authCredentialGeneration) : 0;
+      const canStartRotation = currentGeneration + 1 === generation;
+      const canResumeRotation = currentGeneration === generation &&
+        (data.authCredentialStatus === "provisioning" || data.authCredentialStatus === "active") &&
+        data.pairingReadiness !== "cloud_ready";
+      if (!canStartRotation && !canResumeRotation) throw new ApiError("failed-precondition", "Controller identity changed during migration.");
+    }
+    tx.update(ref, {
+      firebaseAuthUid: uid,
+      authCredentialGeneration: generation,
+      authCredentialStatus: "provisioning",
+      pairingReadiness: "pending",
+    });
   });
   const claims = { deviceType: "main-controller", controllerId, credentialGeneration: generation };
   await auth.updateUser(uid, { customClaims: claims, disabled: false,
-    ...(controller.authCredentialStatus === "revoked" ? { revokeBeforeSeconds: Math.floor(Date.now() / 1000) } : {}) });
+    ...(rotateGeneration || controller.authCredentialStatus === "revoked" ? { revokeBeforeSeconds: Math.floor(Date.now() / 1000) } : {}) });
   const customToken = await auth.createCustomToken(uid, claims);
   await store.runTransaction(async tx => {
     const ref = store.doc("controllers", controllerId);
     const current = await tx.get(ref);
-    if (!current.exists || current.data()?.activeHouseId !== houseId || current.data()?.controllerId !== controllerId) throw new ApiError("failed-precondition", "Controller assignment changed during provisioning.");
-    tx.update(ref, { firebaseAuthUid: uid, authCredentialGeneration: generation, authCredentialStatus: "active" });
+    if (!current.exists || current.data()?.activeHouseId !== houseId ||
+      current.data()?.controllerId !== controllerId ||
+      current.data()?.authCredentialGeneration !== generation ||
+      current.data()?.authCredentialStatus !== "provisioning" ||
+      current.data()?.pendingUnpairOperationId != null) {
+      throw new ApiError("failed-precondition", "Controller assignment changed during provisioning.");
+    }
+    tx.update(ref, {
+      firebaseAuthUid: uid,
+      authCredentialGeneration: generation,
+      authCredentialStatus: "active",
+      pairingReadiness: "pending",
+    });
   });
   return { customToken, authUid: uid, credentialGeneration: generation };
 }
