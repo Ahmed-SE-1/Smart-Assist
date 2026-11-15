@@ -150,7 +150,9 @@ class _MainControllerPairingScreenState
         _pairing = false;
         _progress = null;
       });
-      _showMessage('Main Controller ${result.controllerId} paired and cloud-ready.');
+      _showMessage(
+        'Main Controller ${result.controllerId} paired and cloud-ready.',
+      );
     } catch (error) {
       if (!mounted) return;
       if (error is MainControllerPairingException &&
@@ -646,7 +648,7 @@ class _MainControllerPairingScreenState
                   ? 'Waiting for authenticated cloud readiness'
                   : controllerOnline
                   ? 'Cloud pairing confirmed; last contact ${state.lastSeenAt!.toLocal()}'
-                  : 'Cloud pairing confirmed; no recent controller contact',
+                  : 'Cloud pairing confirmed; no recent controller contact'}',
             ),
             isThreeLine: true,
           ),

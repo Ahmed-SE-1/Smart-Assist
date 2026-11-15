@@ -72,32 +72,35 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                     room.mqttNodeId,
                   );
                 } else if (value == 'delete') {
-                ref.read(roomsProvider.notifier).removeRoom(room.id).then((
-                  error,
-                ) {
-                  if (!context.mounted) return;
-                  if (error == null) {
-                    context.pop();
-                  } else {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(error)));
-                  }
-                });
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Edit Room')),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text(
-                      'Delete Room',
-                      style: TextStyle(color: Colors.red),
+                  ref.read(roomsProvider.notifier).removeRoom(room.id).then((
+                    error,
+                  ) {
+                    if (!context.mounted) return;
+                    if (error == null) {
+                      context.pop();
+                    } else {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(error)));
+                    }
+                  });
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit Room'),
                     ),
-                  ),
-                ],
-          ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Delete Room',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+            ),
         ],
       ),
       body: SafeArea(
@@ -229,7 +232,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         children: [
           Icon(
             Icons.lightbulb_outline,
-            color: device.isOn ? Colors.orange : Colors.grey,
+            color: device.displayIsOn ? Colors.orange : Colors.grey,
             size: 32,
           ),
           const SizedBox(width: 16),
@@ -245,14 +248,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   ),
                 ),
                 Text(
-                  device.isOn ? 'ON' : 'OFF',
+                  device.displayedPowerLabel,
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                 ),
               ],
             ),
           ),
           Switch(
-            value: device.isOn,
+            value: device.displayIsOn,
             onChanged: (v) => _toggleDevice(device),
             activeColor: Theme.of(context).colorScheme.primary,
           ),
@@ -284,7 +287,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
             children: [
               Icon(
                 Icons.air,
-                color: device.isOn ? Colors.teal : Colors.grey,
+                color: device.displayIsOn ? Colors.teal : Colors.grey,
                 size: 32,
               ),
               const SizedBox(width: 16),
@@ -300,7 +303,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       ),
                     ),
                     Text(
-                      device.isOn ? 'Speed ${device.fanSpeed}' : 'OFF',
+                      device.pendingState != null
+                          ? device.displayedPowerLabel
+                          : device.isOn
+                          ? 'Speed ${device.fanSpeed}'
+                          : 'OFF',
                       style: TextStyle(
                         color: Colors.grey.shade500,
                         fontSize: 12,
@@ -310,7 +317,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                 ),
               ),
               Switch(
-                value: device.isOn,
+                value: device.displayIsOn,
                 onChanged: (v) => _toggleDevice(device),
                 activeColor: Theme.of(context).colorScheme.primary,
               ),
@@ -749,61 +756,70 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                   actionsPadding: const EdgeInsets.all(24),
                   actions: [
                     TextButton(
-                      onPressed:
-                          isSaving ? null : () => Navigator.pop(ctx),
+                      onPressed: isSaving ? null : () => Navigator.pop(ctx),
                       child: Text(
                         'Cancel',
                         style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: isSaving ? null : () async {
-                        if (controller.text.trim().isEmpty) {
-                          setDialogState(
-                            () => saveError = 'Device name cannot be empty.',
-                          );
-                          return;
-                        }
-                        setDialogState(() {
-                          isSaving = true;
-                          saveError = null;
-                        });
-                        String? error;
-                        try {
-                          error = await ref
-                              .read(devicesProvider.notifier)
-                              .addDevice(
-                                controller.text,
-                                selectedType,
-                                roomId,
-                              );
-                        } catch (exception) {
-                          error = 'Device could not be saved: $exception';
-                        } finally {
-                          if (ctx.mounted) {
-                            setDialogState(() => isSaving = false);
-                          }
-                        }
-                        if (!mounted || !context.mounted || !ctx.mounted)
-                          return;
-                        if (error != null) {
-                          setDialogState(() => saveError = error);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(error),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        } else {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${controller.text} added!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
+                      onPressed:
+                          isSaving
+                              ? null
+                              : () async {
+                                if (controller.text.trim().isEmpty) {
+                                  setDialogState(
+                                    () =>
+                                        saveError =
+                                            'Device name cannot be empty.',
+                                  );
+                                  return;
+                                }
+                                setDialogState(() {
+                                  isSaving = true;
+                                  saveError = null;
+                                });
+                                String? error;
+                                try {
+                                  error = await ref
+                                      .read(devicesProvider.notifier)
+                                      .addDevice(
+                                        controller.text,
+                                        selectedType,
+                                        roomId,
+                                      );
+                                } catch (exception) {
+                                  error =
+                                      'Device could not be saved: $exception';
+                                } finally {
+                                  if (ctx.mounted) {
+                                    setDialogState(() => isSaving = false);
+                                  }
+                                }
+                                if (!mounted ||
+                                    !context.mounted ||
+                                    !ctx.mounted)
+                                  return;
+                                if (error != null) {
+                                  setDialogState(() => saveError = error);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(error),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${controller.text} added!',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
@@ -816,12 +832,12 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       child:
                           isSaving
                               ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                               : const Text('Create Device'),
                     ),
                   ],

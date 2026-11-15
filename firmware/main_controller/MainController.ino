@@ -1289,6 +1289,17 @@ void forwardToNode(
   }
 }
 
+bool isValidRoomCommandPayload(byte* payload, unsigned int length) {
+  if (payload == nullptr || length == 0 || length > 250) return false;
+  StaticJsonDocument<192> request;
+  const DeserializationError error = deserializeJson(request, payload, length);
+  if (error || !request["channel"].is<int>() ||
+      !request["state"].is<const char*>()) return false;
+  const int channel = request["channel"].as<int>();
+  const String state = request["state"].as<String>();
+  return channel >= 0 && channel <= 2 && (state == "ON" || state == "OFF");
+}
+
 
 // ---------- MQTT Callback ----------
 
@@ -1310,15 +1321,17 @@ void mqttCallback(
     return;
   }
 
-  // Keep existing room command bytes and routing unchanged. Once unpair
-  // preparation is durable, stop applying House-scoped commands.
+  // Once unpair preparation is durable, stop applying House-scoped commands.
   if (houseId.isEmpty() || !unpairPhase.isEmpty()) return;
 
-  Serial.println("MQTT room command received.");
-  Serial.print("Topic: ");
-  Serial.println(topic);
-
-  if (strstr(topic, "/ROOM1_NODE/cmd") != nullptr) {
+  const String room1Topic = "smartassist/" + houseId + "/ROOM1_NODE/cmd";
+  const String room2Topic = "smartassist/" + houseId + "/ROOM2_NODE/cmd";
+  if (!isValidRoomCommandPayload(payload, length)) {
+    Serial.println("MQTT room command rejected: invalid payload.");
+    return;
+  }
+  if (room1Topic.equals(topic)) {
+    Serial.println("MQTT Room 1 command received.");
     forwardToNode(
       NODE1_MAC,
       payload,
@@ -1328,8 +1341,8 @@ void mqttCallback(
 
   }
 
-  else if (strstr(topic, "/ROOM2_NODE/cmd") != nullptr) {
-
+  else if (room2Topic.equals(topic)) {
+    Serial.println("MQTT Room 2 command received.");
     forwardToNode(
       NODE2_MAC,
       payload,
@@ -1339,7 +1352,7 @@ void mqttCallback(
 
   }
 
-  else Serial.println("Unknown room command topic ignored.");
+  else Serial.println("MQTT room command rejected: topic is not assigned to this House.");
 }
 
 

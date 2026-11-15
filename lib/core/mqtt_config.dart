@@ -1,16 +1,16 @@
-/// MQTT configuration for test-only direct broker clients.
+/// MQTT configuration for the original direct-to-EMQX device-control path.
 ///
-/// Production mobile builds must not receive broker credentials through
-/// dart-define: values compiled into an app package are extractable. Secure
-/// owner command publishing through the Worker is not implemented yet, so the
-/// default app configuration intentionally has no broker credentials.
+/// Direct credentials may be supplied only to local debug runs. They are
+/// compiled into the debug application and must never be used for a
+/// distributable/release build. Production builds fail closed until the app
+/// has a broker authorization flow that does not embed a shared credential.
 class MqttConfig {
   const MqttConfig({
     bool? enabled,
     this.host = const String.fromEnvironment('MQTT_HOST'),
     this.port = const int.fromEnvironment('MQTT_PORT', defaultValue: 8883),
-    this.username = '',
-    this.password = '',
+    this.username = const String.fromEnvironment('MQTT_USERNAME'),
+    this.password = const String.fromEnvironment('MQTT_PASSWORD'),
     this.clientId = const String.fromEnvironment('MQTT_CLIENT_ID'),
     this.caAsset = const String.fromEnvironment(
       'MQTT_CA_ASSET',
@@ -46,6 +46,11 @@ class MqttConfig {
   final int testChannel;
 
   String? get connectionError {
+    if (enabled &&
+        (const bool.fromEnvironment('dart.vm.product') ||
+            const bool.fromEnvironment('dart.vm.profile'))) {
+      return 'Direct MQTT credentials are disabled outside local debug builds.';
+    }
     if (host.trim().isEmpty) return 'MQTT host is not configured.';
     if (port < 1 || port > 65535) return 'MQTT port is invalid.';
     if (username.trim().isEmpty || password.isEmpty) {
@@ -60,7 +65,8 @@ class MqttConfig {
   String? get mappingError {
     if (testAppDeviceId.trim().isEmpty ||
         testMqttDeviceId.trim().isEmpty ||
-        testChannel < 1) {
+        testChannel < 0 ||
+        testChannel > 2) {
       return 'MQTT test device mapping is not configured.';
     }
     return null;

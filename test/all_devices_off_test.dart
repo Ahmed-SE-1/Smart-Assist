@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_home/models/device.dart';
+import 'package:smart_home/models/user.dart';
 import 'package:smart_home/providers/service_providers.dart';
 import 'package:smart_home/providers/smart_home_provider.dart';
+import 'package:smart_home/providers/user_provider.dart';
 import 'package:smart_home/services/iot_simulation_service.dart';
 import 'package:smart_home/services/mqtt_service.dart';
 
@@ -48,6 +50,15 @@ class _Mqtt extends MqttService {
   }
 }
 
+class _SignedInOwner extends UserNotifier {
+  @override
+  User? build() => User(
+    id: 'owner',
+    name: 'Owner',
+    email: 'owner@example.com',
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -86,6 +97,7 @@ void main() {
       overrides: [
         devicesProvider.overrideWith(() => _SeededDevices(seed)),
         mqttServiceProvider.overrideWithValue(mqtt),
+        userProvider.overrideWith(_SignedInOwner.new),
       ],
     );
     addTearDown(container.dispose);

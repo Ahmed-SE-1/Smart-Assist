@@ -23,6 +23,10 @@ class Device {
   final DeviceType type;
   final String roomId;
   final bool isOn;
+
+  /// Temporary requested state shown only until a device state report arrives.
+  /// This value is never persisted as the confirmed relay state.
+  final bool? pendingState;
   final int fanSpeed;
   final int acTemperature;
   final double sensorValue;
@@ -37,12 +41,20 @@ class Device {
     required this.type,
     required this.roomId,
     this.isOn = false,
+    this.pendingState,
     this.fanSpeed = 0,
     this.acTemperature = 24,
     this.sensorValue = 0.0,
     this.sensorType = 'temperature',
     this.channel,
   });
+
+  bool get displayIsOn => pendingState ?? isOn;
+
+  String get displayedPowerLabel =>
+      pendingState == null
+          ? (isOn ? 'ON' : 'OFF')
+          : '${pendingState! ? 'ON' : 'OFF'} (pending)';
 
   static bool isRelayType(DeviceType type) =>
       type == DeviceType.fan || type == DeviceType.light;
@@ -71,6 +83,8 @@ class Device {
     DeviceType? type,
     String? roomId,
     bool? isOn,
+    bool? pendingState,
+    bool clearPendingState = false,
     int? fanSpeed,
     int? acTemperature,
     double? sensorValue,
@@ -84,6 +98,8 @@ class Device {
       type: type ?? this.type,
       roomId: roomId ?? this.roomId,
       isOn: isOn ?? this.isOn,
+      pendingState:
+          clearPendingState ? null : (pendingState ?? this.pendingState),
       fanSpeed: fanSpeed ?? this.fanSpeed,
       acTemperature: acTemperature ?? this.acTemperature,
       sensorValue: sensorValue ?? this.sensorValue,

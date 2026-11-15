@@ -1,0 +1,8 @@
+{
+  "MQTT_ENABLED": "true",
+  "MQTT_HOST": "ab81af18.ala.asia-southeast1.emqxsl.com",
+  "MQTT_PORT": "8883",
+  "MQTT_USERNAME": "smartassist_backend",
+  "MQTT_PASSWORD": "REPLACE_LOCALLY_DO_NOT_COMMIT",
+  "MQTT_CA_ASSET": "assets/certs/emqx_ca.crt"
+}

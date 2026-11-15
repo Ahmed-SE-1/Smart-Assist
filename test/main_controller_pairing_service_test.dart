@@ -268,6 +268,7 @@ void main() {
         'activeHouseId': 'owner-1',
         'firebaseAuthUid': 'smartassist-controller-$_controllerId',
         'authCredentialStatus': 'active',
+        'pairingReadiness': 'cloud_ready',
       };
 
       final found = <MainControllerBleDevice>[];
@@ -641,7 +642,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Main Controller connected'), findsOneWidget);
+      expect(find.text('Pairing pending'), findsOneWidget);
 
       await tester.tap(find.text('Disconnect Controller'));
       await tester.pumpAndSettle();

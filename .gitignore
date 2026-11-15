@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/\.tmp/
+/mqtt.local.json
 
 # Symbolication related
 app.*.symbols

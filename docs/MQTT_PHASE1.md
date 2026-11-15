@@ -32,14 +32,19 @@ On the broker machine, inspect commands with:
 mosquitto_sub -h 127.0.0.1 -p 8883 --cafile <CA_FILE> -u <USERNAME> -P '<SECRET>' -t 'smartassist/+/+/cmd' -q 1 -v
 ```
 
-The payload contains only `cmdId`, `channel`, and `state`. QoS is 1 and retain
-is false. A queued publish is not an ESP32 acknowledgement.
+The original command payload is `{"channel":1,"state":"ON"}`. Channel `0`
+means fan and light, `1` fan, and `2` light. The app does not add fields that
+older Node parsers may reject. QoS is 1 and retain is false. A locally queued
+publish is not a broker delivery confirmation or an ESP32 relay acknowledgement.
 
-## Proposed PIR events
+## PIR events and controller status
 
-The Flutter app subscribes, on the same TLS client, to:
+The Flutter app subscribes, on the same TLS client, to House events and Main
+Controller availability:
 
 `smartassist/{HOUSE_ID}/+/events`
+
+`smartassist/{HOUSE_ID}/MAIN_01/status`
 
 A motion event the app will accept:
 
@@ -65,6 +70,9 @@ A timeout event:
 }
 ```
 
-`{ROOM_NODE}` is `ROOM1_NODE` or `ROOM2_NODE`. No firmware in this repository
-publishes these messages. Until the Main ESP32 does, the app cannot show a
-live PIR update.
+The Main Controller accepts `PIR_EVENT:` packets from Node 2 and forwards their
+JSON unchanged to `smartassist/{HOUSE_ID}/ROOM2_NODE/events`. Node 2 firmware is
+not present here, so its emitted event JSON cannot be verified from this
+repository. Main Controller status currently publishes `ONLINE` when its MQTT
+connection is established. Neither message confirms a light or fan relay
+state.

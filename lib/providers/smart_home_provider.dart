@@ -499,21 +499,24 @@ final visibleRoomsProvider = Provider<List<Room>>((ref) {
 // DEVICE STATE MANAGEMENT
 // ═══════════════════════════════════════════
 
-/// Outcome of the existing sequential, per-device OFF operation.
+/// Outcome of the all-device OFF request.
 class AllDevicesOffResult {
   const AllDevicesOffResult({
     required this.controllableCount,
     required this.alreadyOffCount,
     required this.turnedOffCount,
     required this.failedCount,
+    this.messageOverride,
   });
 
   final int controllableCount;
   final int alreadyOffCount;
   final int turnedOffCount;
   final int failedCount;
+  final String? messageOverride;
 
   String get message {
+    if (messageOverride != null) return messageOverride!;
     if (controllableCount == 0) return 'No controllable devices found.';
     if (failedCount > 0) {
       return '$turnedOffCount devices turned OFF. '
@@ -821,6 +824,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   void _syncDeviceStateToFirestore(String deviceId, Map<String, dynamic> data) {
+    if (Firebase.apps.isEmpty) return;
     final houseId = ref.read(userProvider)?.houseId?.trim();
     if (houseId != null && houseId.isNotEmpty) {
       FirebaseFirestore.instance
@@ -965,13 +969,21 @@ class DevicesNotifier extends Notifier<List<Device>> {
     if (lights.isEmpty) return false;
     final changing =
         lights.where((device) => device.isOn != event.lightOn).toList();
-    if (changing.isEmpty) return false;
+    final confirmedPending =
+        lights.where((device) => device.pendingState == event.lightOn).toList();
+    if (changing.isEmpty && confirmedPending.isEmpty) return false;
 
-    final ids = changing.map((device) => device.id).toSet();
+    final ids = {
+      ...changing.map((device) => device.id),
+      ...confirmedPending.map((device) => device.id),
+    };
     state =
         state.map((device) {
           if (ids.contains(device.id)) {
-            return device.copyWith(isOn: event.lightOn);
+            return device.copyWith(
+              isOn: event.lightOn,
+              clearPendingState: device.pendingState == event.lightOn,
+            );
           }
           return device;
         }).toList();
@@ -1002,7 +1014,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
   }
 
   Future<bool> toggleDevice(Device device, {String method = 'app'}) async {
-    final newState = !device.isOn;
+    final newState = !(device.pendingState ?? device.isOn);
     final result = await _command(
       device,
       action: newState ? 'ON' : 'OFF',
@@ -1011,6 +1023,18 @@ class DevicesNotifier extends Notifier<List<Device>> {
     lastCommandMessage = result.message;
 
     if (result.success) {
+      if (result.method == 'mqtt') {
+        // MQTT publish has no relay acknowledgement. Keep confirmed state
+        // untouched and show the requested value as pending in the UI.
+        state =
+            state.map((d) {
+              if (d.id == device.id) {
+                return d.copyWith(pendingState: newState);
+              }
+              return d;
+            }).toList();
+        return true;
+      }
       state =
           state.map((d) {
             if (d.id == device.id) return d.copyWith(isOn: newState);
@@ -1152,7 +1176,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
       (d) => d.id == deviceId,
       orElse: () => throw Exception('Device not found'),
     );
-    if (device.isOn) return true;
+    if (device.pendingState ?? device.isOn) return true;
     return toggleDevice(device, method: method);
   }
 
@@ -1161,7 +1185,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
       (d) => d.id == deviceId,
       orElse: () => throw Exception('Device not found'),
     );
-    if (!device.isOn) return true;
+    if (!(device.pendingState ?? device.isOn)) return true;
     return toggleDevice(device, method: method);
   }
 
@@ -1183,6 +1207,14 @@ class DevicesNotifier extends Notifier<List<Device>> {
       }
       return true;
     }).toList();
+    final mqttConfig = ref.read(mqttConfigProvider);
+    if (mqttConfig.enabled) {
+      return _turnOffAllWithMqtt(
+        devices,
+        user.houseId?.trim() ?? '',
+        method,
+      );
+    }
     var alreadyOff = 0;
     var turnedOff = 0;
     var failed = 0;
@@ -1209,6 +1241,91 @@ class DevicesNotifier extends Notifier<List<Device>> {
       alreadyOffCount: alreadyOff,
       turnedOffCount: turnedOff,
       failedCount: failed,
+    );
+  }
+
+  Future<AllDevicesOffResult> _turnOffAllWithMqtt(
+    List<Device> devices,
+    String houseId,
+    String method,
+  ) async {
+    final mqtt = ref.read(mqttServiceProvider);
+    final rooms = {for (final room in ref.read(roomsProvider)) room.id: room};
+    final byNode = <String, List<Device>>{};
+    final unmappedRelayDevices = <Device>[];
+    final simulatedDevices = <Device>[];
+    for (final device in devices) {
+      if (Device.isRelayType(device.type)) {
+        final nodeId = rooms[device.roomId]?.mqttNodeId?.trim();
+        if (nodeId != null && Room.isSupportedMqttNodeId(nodeId)) {
+          byNode.putIfAbsent(nodeId, () => []).add(device);
+        } else {
+          unmappedRelayDevices.add(device);
+        }
+      } else {
+        simulatedDevices.add(device);
+      }
+    }
+
+    var alreadyOff = 0;
+    var turnedOff = 0;
+    var queued = 0;
+    var failed = 0;
+    for (final device in unmappedRelayDevices) {
+      if (device.pendingState ?? device.isOn) {
+        failed++;
+      } else {
+        alreadyOff++;
+      }
+    }
+    for (final entry in byNode.entries) {
+      final result = await mqtt.publishDeviceCommand(
+        houseId: houseId,
+        mqttDeviceId: entry.key,
+        channel: 0,
+        state: 'OFF',
+      );
+      if (result.success) {
+        queued += entry.value.length;
+        final ids = entry.value.map((device) => device.id).toSet();
+        state =
+            state.map((device) {
+              return ids.contains(device.id)
+                  ? device.copyWith(pendingState: false)
+                  : device;
+            }).toList();
+      } else {
+        failed += entry.value.length;
+        lastCommandMessage = result.message;
+      }
+    }
+    for (final device in simulatedDevices) {
+      if (!(device.pendingState ?? device.isOn)) {
+        alreadyOff++;
+        continue;
+      }
+      try {
+        if (await turnOff(device.id, method: method)) {
+          turnedOff++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+
+    final message =
+        queued > 0
+            ? 'OFF command queued for $queued relay device(s); relay state is unconfirmed.'
+                '${failed > 0 ? ' $failed device(s) could not be commanded.' : ''}'
+            : null;
+    return AllDevicesOffResult(
+      controllableCount: devices.length,
+      alreadyOffCount: alreadyOff,
+      turnedOffCount: turnedOff,
+      failedCount: failed,
+      messageOverride: message,
     );
   }
 

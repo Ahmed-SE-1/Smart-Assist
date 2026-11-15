@@ -22,7 +22,7 @@ void main() {
     expect(map['houseId'], 'owner-uid');
     expect(map['mainControllerId'], isNull);
     expect(map['createdAt'], isA<Timestamp>());
-    expect(House.fromMap(map).createdAt, now);
+    expect(House.fromMap(map).createdAt!.isAtSameMomentAs(now), isTrue);
     expect(House.fromMap(map).mainControllerId, isNull);
   });
 
@@ -43,7 +43,7 @@ void main() {
     final decoded = ControllerRegistryEntry.fromMap(map);
     expect(decoded.activeHouseId, isNull);
     expect(decoded.pairedAt, isNull);
-    expect(decoded.lastSeenAt, now);
+    expect(decoded.lastSeenAt!.isAtSameMomentAs(now), isTrue);
   });
 
   test('Node registry round-trips nullable pairing fields', () {

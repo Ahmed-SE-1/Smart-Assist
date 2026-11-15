@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,7 +58,7 @@ class _Mqtt extends MqttService {
       message:
           failPublish
               ? 'MQTT publish failed'
-              : 'Command sent to the broker. The ESP32 has not confirmed the relay.',
+              : 'Command queued for MQTT delivery; the relay state is unconfirmed.',
     );
   }
 
@@ -79,15 +81,26 @@ class _Mqtt extends MqttService {
 }
 
 void main() {
-  test(
-    'default mobile MQTT config never reads credentials from dart-define',
-    () {
-      const config = MqttConfig(enabled: true, host: 'broker.example');
-      expect(config.username, isEmpty);
-      expect(config.password, isEmpty);
-      expect(config.connectionError, contains('username or password'));
-    },
-  );
+  test('default MQTT remains disabled without local debug configuration', () {
+    const config = MqttConfig(enabled: true, host: 'broker.example');
+    expect(config.username, isEmpty);
+    expect(config.password, isEmpty);
+    expect(config.connectionError, contains('username or password'));
+  });
+
+  test('local debug MQTT config validates explicit broker credentials', () {
+    const config = MqttConfig(
+      enabled: true,
+      host: 'ab81af18.ala.asia-southeast1.emqxsl.com',
+      port: 8883,
+      username: 'smartassist_backend',
+      password: 'test-only-secret',
+    );
+    expect(config.connectionError, isNull);
+    expect(config.host, 'ab81af18.ala.asia-southeast1.emqxsl.com');
+    expect(config.port, 8883);
+    expect(config.caAsset, 'assets/certs/emqx_ca.crt');
+  });
 
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -282,7 +295,10 @@ void main() {
     );
     expect(mqtt.published.single['channel'], 1);
     expect(mqtt.published.single['state'], 'ON');
-    expect(container.read(devicesProvider).single.isOn, isTrue);
+    final reported = container.read(devicesProvider).single;
+    expect(reported.isOn, isFalse);
+    expect(reported.pendingState, isTrue);
+    expect(reported.displayedPowerLabel, 'ON (pending)');
   });
 
   test('Pending member cannot publish MQTT device commands', () async {
@@ -460,7 +476,7 @@ void main() {
     expect(device.channel, isNull);
   });
 
-  test('MQTT payload and topic use the firmware contract', () {
+  test('MQTT payload and topic use the original firmware contract', () {
     expect(
       MqttService.commandTopic('house-1', Room.room1NodeId),
       'smartassist/house-1/ROOM1_NODE/cmd',
@@ -469,15 +485,90 @@ void main() {
       MqttService.commandTopic('house-1', Room.room2NodeId),
       'smartassist/house-1/ROOM2_NODE/cmd',
     );
+    expect(
+      MqttService.eventSubscriptionTopic('house-1'),
+      'smartassist/house-1/+/events',
+    );
+    expect(
+      MqttService.controllerStatusTopic('house-1'),
+      'smartassist/house-1/MAIN_01/status',
+    );
     final payload = MqttService.commandPayload(
-      cmdId: 'cmd-1',
+      cmdId: 'test-command-id',
       channel: RelayChannel.fan,
       state: 'ON',
     );
     expect(payload.keys, ['cmdId', 'channel', 'state']);
+    expect(payload['cmdId'], 'test-command-id');
     expect(payload['channel'], 1);
-    expect(payload.containsKey('ts'), isFalse);
+    expect(jsonDecode(jsonEncode(payload)), {
+      'cmdId': 'test-command-id',
+      'channel': 1,
+      'state': 'ON',
+    });
+    expect(
+      jsonDecode(
+        jsonEncode(
+          MqttService.commandPayload(
+            cmdId: 'all-off-command-id',
+            channel: 0,
+            state: 'OFF',
+          ),
+        ),
+      ),
+      {
+        'cmdId': 'all-off-command-id',
+        'channel': 0,
+        'state': 'OFF',
+      },
+    );
+    expect(MqttService.isValidCommand(channel: 0, state: 'OFF'), isTrue);
+    expect(MqttService.isValidCommand(channel: 3, state: 'OFF'), isFalse);
+    expect(MqttService.isValidCommand(channel: 2, state: 'ON'), isTrue);
   });
+
+  test(
+    'All Devices OFF queues one channel 0 command per assigned node',
+    () async {
+      const fan = Device(
+        id: 'fan',
+        name: 'Fan',
+        type: DeviceType.fan,
+        roomId: 'room-1',
+        channel: RelayChannel.fan,
+        isOn: true,
+      );
+      const light = Device(
+        id: 'light',
+        name: 'Light',
+        type: DeviceType.light,
+        roomId: 'room-1',
+        channel: RelayChannel.light,
+        isOn: true,
+      );
+      setup(
+        rooms: [room('room-1', Room.room1NodeId)],
+        devices: [fan, light],
+        config: mqttOn,
+      );
+
+      final result =
+          await container.read(devicesProvider.notifier).turnOffAll();
+
+      expect(mqtt.published, hasLength(1));
+      expect(
+        mqtt.published.single['topic'],
+        'smartassist/house-1/ROOM1_NODE/cmd',
+      );
+      expect(mqtt.published.single['channel'], 0);
+      expect(mqtt.published.single['state'], 'OFF');
+      final devices = container.read(devicesProvider);
+      expect(devices.every((device) => device.isOn), isTrue);
+      expect(devices.every((device) => device.pendingState == false), isTrue);
+      expect(devices.every((device) => !device.displayIsOn), isTrue);
+      expect(result.message, contains('relay state is unconfirmed'));
+    },
+  );
 
   test(
     'Invalid house, node, channel, and state are rejected before connect',
@@ -507,7 +598,7 @@ void main() {
       final badChannel = await service.publishDeviceCommand(
         houseId: 'house-1',
         mqttDeviceId: Room.room1NodeId,
-        channel: 0,
+        channel: 3,
         state: 'ON',
       );
       final badState = await service.publishDeviceCommand(
