@@ -15,7 +15,7 @@ class NlpApiConfig {
   NlpApiConfig._();
 
   /// Hugging Face Space (Gradio) ka direct address.
-  static const String baseUrl = 'https://aqeelabdullah654-nlp-model.hf.space';
+  static const String baseUrl = 'http://192.168.100.76:7860';
 
   /// `api_name="predict"` jo app.py me set hai.
   static const String apiName = 'predict';
