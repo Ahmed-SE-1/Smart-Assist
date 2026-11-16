@@ -272,7 +272,7 @@ class VoiceCommandMapper {
       );
     }
 
-    if (device.isOn == on) {
+    if (device.displayIsOn == on) {
       return VoiceCommandOutcome.ok('${device.name} is already $word.');
     }
 
