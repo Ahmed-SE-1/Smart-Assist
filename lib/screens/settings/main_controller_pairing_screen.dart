@@ -602,6 +602,20 @@ class _MainControllerPairingScreenState
             : controllerOnline
             ? 'Main Controller online'
             : 'Main Controller offline';
+    final String statusDetail;
+    if (state.unpairStatus == 'prepared') {
+      statusDetail = 'Waiting for controller to finish disconnecting';
+    } else if (state.unpairStatus == 'pending') {
+      statusDetail = 'Waiting for controller';
+    } else if (state.pairingReadiness != 'cloud_ready') {
+      statusDetail = 'Waiting for authenticated cloud readiness';
+    } else if (controllerOnline && state.lastSeenAt != null) {
+      statusDetail =
+          'Cloud pairing confirmed; last contact ${state.lastSeenAt!.toLocal()}';
+    } else {
+      statusDetail = 'Cloud pairing confirmed; no recent controller contact';
+    }
+
     return Card(
       child: Column(
         children: [
@@ -639,17 +653,7 @@ class _MainControllerPairingScreenState
                   ? 'Unpair failed; controller remains assigned'
                   : controllerTitle,
             ),
-            subtitle: Text(
-              '${state.controllerId}\n${state.unpairStatus == 'prepared'
-                  ? 'Waiting for controller to finish disconnecting'
-                  : state.unpairStatus == 'pending'
-                  ? 'Waiting for controller'
-                  : state.pairingReadiness != 'cloud_ready'
-                  ? 'Waiting for authenticated cloud readiness'
-                  : controllerOnline
-                  ? 'Cloud pairing confirmed; last contact ${state.lastSeenAt!.toLocal()}'
-                  : 'Cloud pairing confirmed; no recent controller contact'}',
-            ),
+            subtitle: Text('${state.controllerId}\n$statusDetail'),
             isThreeLine: true,
           ),
           if (state.pairedAt != null)

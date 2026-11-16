@@ -186,16 +186,25 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
 
   /// Evaluates the device's [DeviceType] and returns the appropriate specialized UI Card.
   Widget _buildDeviceCard(Device device) {
+    final Widget card;
     switch (device.type) {
       case DeviceType.light:
-        return _buildToggleDeviceCard(device);
+        card = _buildToggleDeviceCard(device);
+        break;
       case DeviceType.fan:
-        return _buildFanCard(device);
+        card = _buildFanCard(device);
+        break;
       case DeviceType.ac:
-        return _buildACDeviceCard(device);
+        card = _buildACDeviceCard(device);
+        break;
       case DeviceType.sensor:
-        return _buildSensorCard(device);
+        card = _buildSensorCard(device);
+        break;
     }
+    return KeyedSubtree(
+      key: ValueKey(device.id),
+      child: card,
+    );
   }
 
   /// Helper to get the correct icon for a device type.

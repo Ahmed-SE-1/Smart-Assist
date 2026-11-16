@@ -291,7 +291,7 @@ void main() {
           .read(devicesProvider.notifier)
           .toggleDevice(room2Light);
       expect(toggleSuccess, isTrue);
-      expect(byId('room2-light').isOn, isTrue);
+      expect(byId('room2-light').displayIsOn, isTrue);
       expect(mqtt.published, ['${Room.room2NodeId}:2:ON']);
       expect(container.read(pirNoticeProvider), isEmpty);
       await Future<void>.delayed(Duration.zero);

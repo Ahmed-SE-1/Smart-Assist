@@ -23,13 +23,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  Future<void> _migrateLocalHouseData() async {
-    final result =
-        await ref.read(roomsProvider.notifier).migrateLocalHouseData();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
-  }
-
   /// Opens a modal dialog allowing the user to update their Name and Profile Picture.
   Future<void> _editProfileDialog() async {
     final user = ref.read(userProvider);
@@ -854,12 +847,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             user.houseId ?? user.id,
                             user.id,
                           ),
-                    ),
-                    _buildDivider(),
-                    _buildListTile(
-                      Icons.cloud_upload_outlined,
-                      'Migrate Local Rooms and Devices',
-                      onTap: _migrateLocalHouseData,
                     ),
                   ],
                 ),

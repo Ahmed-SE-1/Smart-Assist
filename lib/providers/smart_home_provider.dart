@@ -88,7 +88,7 @@ class RoomsNotifier extends Notifier<List<Room>> {
         query = query.where(FieldPath.documentId, whereIn: user!.assignedRoomIds);
       }
       _subscription = query
-          .snapshots(includeMetadataChanges: true)
+          .snapshots()
           .listen(
             (snapshot) {
               if (_activeHouseId != houseId ||
@@ -97,9 +97,7 @@ class RoomsNotifier extends Notifier<List<Room>> {
               }
               ref.read(roomSyncErrorProvider.notifier).state = null;
               final roomsById = {
-                for (final doc in snapshot.docs.where(
-                  (doc) => !doc.metadata.hasPendingWrites,
-                ))
+                for (final doc in snapshot.docs)
                   doc.id: Room.fromMap({...doc.data(), 'id': doc.id}),
               };
               _confirmedRoomWrites.removeWhere(
@@ -154,158 +152,6 @@ class RoomsNotifier extends Notifier<List<Room>> {
     await prefs.setString(getStorageKey(houseId: houseId), encoded);
   }
 
-  /// Owner-triggered, create-only migration for the legacy House-scoped cache.
-  Future<String> migrateLocalHouseData() async {
-    final user = ref.read(userProvider);
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    final houseId = user?.houseId?.trim();
-    if (user == null ||
-        user.role != UserRole.owner ||
-        !user.isApproved ||
-        uid == null ||
-        user.id != uid ||
-        houseId == null ||
-        houseId.isEmpty) {
-      return 'Only the signed-in, approved House owner can migrate local data.';
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final roomJson = prefs.getString('shared_house_rooms_db_$houseId');
-      final deviceJson = prefs.getString('shared_house_devices_db_$houseId');
-      final rooms =
-          roomJson == null
-              ? <Room>[]
-              : (jsonDecode(roomJson) as List)
-                  .map(
-                    (row) =>
-                        Room.fromMap(Map<String, dynamic>.from(row as Map)),
-                  )
-                  .toList();
-      final devices =
-          deviceJson == null
-              ? <Device>[]
-              : (jsonDecode(deviceJson) as List)
-                  .map(
-                    (row) =>
-                        Device.fromMap(Map<String, dynamic>.from(row as Map)),
-                  )
-                  .toList();
-      if (rooms.isEmpty && devices.isEmpty)
-        return 'No local Rooms or Devices need migration.';
-      if (rooms.any((room) => room.id.isEmpty || room.creatorId != uid) ||
-          rooms.map((room) => room.id).toSet().length != rooms.length) {
-        return 'Migration stopped: local Rooms are not uniquely attributable to this House owner.';
-      }
-      final roomIds = rooms.map((room) => room.id).toSet();
-      if (devices.any((device) => device.id.isEmpty || device.roomId.isEmpty) ||
-          devices.map((device) => device.id).toSet().length != devices.length) {
-        return 'Migration stopped: a local Device has an invalid or ambiguous Room relationship.';
-      }
-
-      final houseRef = FirebaseFirestore.instance
-          .collection('houses')
-          .doc(houseId);
-      final houseSnapshot = await houseRef.get();
-      final houseData = houseSnapshot.data();
-      if (!houseSnapshot.exists ||
-          houseData?['houseId'] != houseId ||
-          houseData?['ownerUid'] != uid) {
-        return 'Migration stopped: the signed-in owner could not verify this House record.';
-      }
-      for (final device in devices.where(
-        (item) => !roomIds.contains(item.roomId),
-      )) {
-        if (!(await houseRef.collection('rooms').doc(device.roomId).get())
-            .exists) {
-          return 'Migration stopped: Device ${device.id} refers to a Room that cannot be verified in this House.';
-        }
-      }
-
-      final roomRefs = {
-        for (final room in rooms)
-          room.id: houseRef.collection('rooms').doc(room.id),
-      };
-      final deviceRefs = {
-        for (final device in devices)
-          device.id: houseRef.collection('devices').doc(device.id),
-      };
-      final existingRooms = <String, Map<String, dynamic>>{};
-      final existingDevices = <String, Map<String, dynamic>>{};
-      for (final room in rooms) {
-        final snapshot = await roomRefs[room.id]!.get();
-        if (snapshot.exists) existingRooms[room.id] = snapshot.data()!;
-      }
-      for (final device in devices) {
-        final snapshot = await deviceRefs[device.id]!.get();
-        if (snapshot.exists) existingDevices[device.id] = snapshot.data()!;
-      }
-      for (final room in rooms) {
-        final existing = existingRooms[room.id];
-        if (existing != null &&
-            room.toMap().entries.any(
-              (entry) => existing[entry.key] != entry.value,
-            )) {
-          return 'Migration stopped: cloud Room ${room.id} already exists with different data.';
-        }
-      }
-      for (final device in devices) {
-        final existing = existingDevices[device.id];
-        final expected = _sharedDeviceData(device);
-        if (existing != null &&
-            expected.entries.any(
-              (entry) => existing[entry.key] != entry.value,
-            )) {
-          return 'Migration stopped: cloud Device ${device.id} already exists with different data.';
-        }
-      }
-
-      for (final room in rooms.where(
-        (item) => !existingRooms.containsKey(item.id),
-      )) {
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final snapshot = await transaction.get(roomRefs[room.id]!);
-          if (snapshot.exists) {
-            final data = snapshot.data()!;
-            if (room.toMap().entries.any(
-              (entry) => data[entry.key] != entry.value,
-            )) {
-              throw StateError('Room ${room.id} changed during migration.');
-            }
-          } else {
-            transaction.set(roomRefs[room.id]!, room.toMap());
-          }
-        });
-      }
-      for (final device in devices.where(
-        (item) => !existingDevices.containsKey(item.id),
-      )) {
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final reference = deviceRefs[device.id]!;
-          final snapshot = await transaction.get(reference);
-          final expected = _sharedDeviceData(device);
-          if (snapshot.exists) {
-            final data = snapshot.data()!;
-            if (expected.entries.any(
-              (entry) => data[entry.key] != entry.value,
-            )) {
-              throw StateError('Device ${device.id} changed during migration.');
-            }
-          } else {
-            transaction.set(reference, expected);
-          }
-        });
-      }
-      for (final reference in [...roomRefs.values, ...deviceRefs.values]) {
-        if (!(await reference.get()).exists)
-          return 'Migration could not verify every cloud record; local data was retained.';
-      }
-      return 'Migration complete: ${rooms.length} Rooms and ${devices.length} Devices verified. Local data was retained.';
-    } catch (_) {
-      return 'Migration failed before verification. Local data was retained; retry after resolving Firestore access.';
-    }
-  }
-
   Future<String?> addRoom(
     String name,
     String iconAsset,
@@ -343,8 +189,9 @@ class RoomsNotifier extends Notifier<List<Room>> {
     if (houseId == null ||
         houseId.isEmpty ||
         ref.read(userProvider)?.isApproved != true ||
-        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid) {
       return 'An approved House member is required.';
+    }
     if (creatorId != FirebaseAuth.instance.currentUser?.uid) {
       return 'The Room creator must be the signed-in House member.';
     }
@@ -404,8 +251,9 @@ class RoomsNotifier extends Notifier<List<Room>> {
     if (houseId == null ||
         houseId.isEmpty ||
         ref.read(userProvider)?.isApproved != true ||
-        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid) {
       return 'An approved House member is required.';
+    }
     try {
       await FirebaseFirestore.instance
           .collection('houses')
@@ -569,7 +417,7 @@ class DevicesNotifier extends Notifier<List<Device>> {
         query = query.where('roomId', whereIn: user!.assignedRoomIds);
       }
       _subscription = query
-          .snapshots(includeMetadataChanges: true)
+          .snapshots()
           .listen(
             (snapshot) {
               if (_activeHouseId != houseId ||
@@ -579,18 +427,24 @@ class DevicesNotifier extends Notifier<List<Device>> {
               ref.read(deviceSyncErrorProvider.notifier).state = null;
               final live = {for (final d in state) d.id: d};
               final devicesById = <String, Device>{};
-              for (final doc in snapshot.docs.where(
-                (doc) => !doc.metadata.hasPendingWrites,
-              )) {
-                    final cloud = Device.fromMap({...doc.data(), 'id': doc.id});
-                    final previous = live[cloud.id];
-                    final cloudData = doc.data();
-                    devicesById[cloud.id] = cloud.copyWith(
-                      isOn: cloudData['isOn'] is bool ? cloudData['isOn'] as bool : (previous?.isOn ?? false),
-                      fanSpeed: cloudData['fanSpeed'] is int ? cloudData['fanSpeed'] as int : (previous?.fanSpeed ?? 0),
-                      acTemperature: cloudData['acTemperature'] is int ? cloudData['acTemperature'] as int : (previous?.acTemperature ?? 24),
-                      sensorValue: cloudData['sensorValue'] is num ? (cloudData['sensorValue'] as num).toDouble() : (previous?.sensorValue ?? 0.0),
-                    );
+              for (final doc in snapshot.docs) {
+                final cloud = Device.fromMap({...doc.data(), 'id': doc.id});
+                final previous = live[cloud.id];
+                final cloudData = doc.data();
+                devicesById[cloud.id] = cloud.copyWith(
+                  isOn: cloudData['isOn'] is bool
+                      ? cloudData['isOn'] as bool
+                      : (previous?.isOn ?? false),
+                  fanSpeed: cloudData['fanSpeed'] is int
+                      ? cloudData['fanSpeed'] as int
+                      : (previous?.fanSpeed ?? 0),
+                  acTemperature: cloudData['acTemperature'] is int
+                      ? cloudData['acTemperature'] as int
+                      : (previous?.acTemperature ?? 24),
+                  sensorValue: cloudData['sensorValue'] is num
+                      ? (cloudData['sensorValue'] as num).toDouble()
+                      : (previous?.sensorValue ?? 0.0),
+                );
               }
               _confirmedDeviceWrites.removeWhere(
                 (deviceId, _) => devicesById.containsKey(deviceId),
@@ -679,13 +533,15 @@ class DevicesNotifier extends Notifier<List<Device>> {
         houseId.isEmpty ||
         user?.isApproved != true ||
         user?.id != uid ||
-        uid == null)
+        uid == null) {
       return 'An approved House member is required.';
+    }
     final roomMatches = ref
         .read(roomsProvider)
         .where((room) => room.id == roomId);
-    if (roomMatches.isEmpty)
+    if (roomMatches.isEmpty) {
       return 'Choose a Room in the selected House.';
+    }
     final room = roomMatches.first;
     if (user!.role != UserRole.owner && room.creatorId != uid) {
       return 'Members can add Devices only to Rooms they created.';
@@ -731,8 +587,9 @@ class DevicesNotifier extends Notifier<List<Device>> {
     if (houseId == null ||
         houseId.isEmpty ||
         ref.read(userProvider)?.isApproved != true ||
-        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid)
+        ref.read(userProvider)?.id != FirebaseAuth.instance.currentUser?.uid) {
       return 'An approved House member is required.';
+    }
     try {
       await FirebaseFirestore.instance
           .collection('houses')
@@ -772,8 +629,9 @@ class DevicesNotifier extends Notifier<List<Device>> {
     if (houseId == null ||
         houseId.isEmpty ||
         user?.isApproved != true ||
-        user?.id != FirebaseAuth.instance.currentUser?.uid)
+        user?.id != FirebaseAuth.instance.currentUser?.uid) {
       return 'An approved House member is required.';
+    }
     final matching = state.where((device) => device.id == deviceId);
     if (matching.isEmpty) return 'Device no longer exists.';
     final device = matching.first;

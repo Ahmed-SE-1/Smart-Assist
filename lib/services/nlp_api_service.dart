@@ -172,7 +172,7 @@ class NlpApiService {
     }
     _workingPrefix = usedPrefix;
 
-    final eventId = (jsonDecode(utf8.decode(post!.bodyBytes))
+    final eventId = (jsonDecode(utf8.decode(post.bodyBytes))
     as Map<String, dynamic>)['event_id'] as String?;
     if (eventId == null) {
       throw _NlpException(
